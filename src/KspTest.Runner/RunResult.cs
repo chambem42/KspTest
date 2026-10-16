@@ -10,11 +10,15 @@ namespace KspTest.Runner
     /// <summary>A run's outcome: the harness's result.json, or why there is none.</summary>
     public sealed class RunResult
     {
-        /// <summary>pass, fail, skipped, crash, timeout from the harness; load-hang, frozen, no-result from the runner.</summary>
+        /// <summary>pass, fail, skipped, crash, timeout from the harness; load-hang, frozen, crashed, no-result from the runner.</summary>
         public string Status = "unknown";
 
         public double DurationSec;
         public string? Scene;
+
+        /// <summary>Unity's crash report, summarized, when KSP crashed before the harness wrote a result.</summary>
+        public string? Crash;
+
         public string ResultsDir = "";
         public List<TestResult> Tests = new List<TestResult>();
 
@@ -72,6 +76,8 @@ namespace KspTest.Runner
                 sb.Append(t.Report());
             if (Tests.Count > 0 || Scene != null)
                 sb.AppendLine($"==== RUN: {Status.ToUpperInvariant()}  ({DurationSec}s total, {Tests.Count} tests, ended in {Scene}) ====");
+            else if (Crash != null)
+                sb.AppendLine($"==== RUN: {Status.ToUpperInvariant()} - {Crash}");
             else
                 sb.AppendLine($"==== RUN: {Status.ToUpperInvariant()} - no result.json (KSP crashed or the harness never started); see {Path.Combine(ResultsDir, "KSP.log")}");
             if (Exceptions.Count > 0)

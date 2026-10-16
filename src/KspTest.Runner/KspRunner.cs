@@ -43,7 +43,11 @@ namespace KspTest.Runner
                     o.SaveBackupRoot ?? Path.Combine(o.ResultsRoot, "..", "save-backups"), o.SaveFolder, log);
             }
 
+            if (SystemMemory.Commit() is (double used, double limit))
+                log($"system commit {used:F1}/{limit:F1} GB ({limit - used:F1} GB free for KSP)");
+
             var tweaks = new InstallTweaks(install, log);
+            DateTime runStarted = DateTime.Now;
             string runCfg = RunCfg(o, resultsDir);
             Process? proc = null;
             string status = "unknown";
@@ -87,7 +91,14 @@ namespace KspTest.Runner
                     TryCopy(install.KspLog, Path.Combine(resultsDir, "KSP.log"));
             }
 
-            return RunResult.Read(resultsDir, status);
+            RunResult result = RunResult.Read(resultsDir, status);
+            if (result.Status == "no-result" && SystemMemory.CollectCrash(runStarted, resultsDir) is string crash)
+            {
+                result.Status = "crashed";
+                result.Crash = crash;
+            }
+
+            return result;
         }
 
         private static string RunCfg(RunOptions o, string resultsDir)
