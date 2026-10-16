@@ -2,6 +2,9 @@
   <Folder Name="/src/">
     <Project Path="src/KspTest.MechJeb/KspTest.MechJeb.csproj" />
     <Project Path="src/KspTest.RP1/KspTest.RP1.csproj" />
+    <Project Path="src/KspTest.Runner/KspTest.Runner.csproj" />
+    <Project Path="src/KspTest.Tool/KspTest.Tool.csproj" />
+    <Project Path="src/KspTest.Xunit/KspTest.Xunit.csproj" />
     <Project Path="src/KspTest/KspTest.csproj" />
   </Folder>
   <Folder Name="/tests/">

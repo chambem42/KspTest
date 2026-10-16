@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>KspTest.Runner</RootNamespace>
+    <PackageId>KspTest.Runner</PackageId>
+    <Description>Runs KspTest in-game tests from outside the game on Windows, Linux or macOS: deploys the harness and test assemblies into a KSP install, resets the test save, launches KSP, watches it and collects the results.</Description>
+    <Nullable>enable</Nullable>
+    <LangVersion>10</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
+  </ItemGroup>
+
+  <!-- the in-game harness and its integrations ride along in the package (gamedata/), so the runner deploys the harness
+       its version was built with -->
+  <ItemGroup>
+    <ProjectReference Include="../KspTest/KspTest.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+    <ProjectReference Include="../KspTest.MechJeb/KspTest.MechJeb.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+    <ProjectReference Include="../KspTest.RP1/KspTest.RP1.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.MechJeb.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.RP1.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/KspTest.version" />
+    <None Include="@(HarnessFile)" Pack="true" PackagePath="gamedata/KspTest/%(Filename)%(Extension)" Visible="false" />
+    <None Include="build/KspTest.Runner.targets" Pack="true" PackagePath="build/;buildTransitive/" />
+  </ItemGroup>
+</Project>

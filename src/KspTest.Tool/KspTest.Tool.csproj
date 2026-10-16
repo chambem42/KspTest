@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <RootNamespace>KspTest.Tool</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>ksptest</ToolCommandName>
+    <PackageId>KspTest.Tool</PackageId>
+    <Description>ksptest: deploy KspTest into a KSP install and run in-game tests from the command line, on Windows, Linux or macOS.</Description>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KspTest.Runner/KspTest.Runner.csproj" />
+  </ItemGroup>
+  <!-- the harness the tool deploys, from the runner's build (the package build target does this for package consumers) -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.dll;$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.MechJeb.dll;$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.RP1.dll;$(MSBuildThisFileDirectory)../../GameData/KspTest/KspTest.version"
+          Link="ksptest/gamedata/KspTest/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>

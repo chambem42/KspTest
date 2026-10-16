@@ -9,24 +9,9 @@ using MuMech;
 
 namespace KspTest.Tests.MechJeb
 {
-    /// <summary>MechJeb-driven flight tests. Params: craft, orbitAltKm, inclination, ascentType (CLASSIC|PVG), warp.</summary>
+    /// <summary>FAR flight tests flown with MechJeb (FAR's; MechJeb's own tests are in the MechJeb2 repo, MechJebKspTest).</summary>
     public static class MechJebTests
     {
-        [UITest("Mj_SmartAss", Requires = "MechJeb", StartsAt = StartState.Flight, Craft = "UITest_Rocket")]
-        public static IEnumerator Mj_SmartAss(TestContext ctx)
-        {
-            Assert.True(Mj.Present, "vessel has a MechJebCore (MechJebForAll or an MJ part)");
-            ctx.Step("SmartASS surface hold on the pad");
-            Mj.SmartAssSurface(heading: 90, pitch: 90);
-            yield return Wait.Seconds(3);
-            var sa = Mj.Core.GetComputerModule<MechJebModuleSmartASS>();
-            Assert.Equal(MechJebModuleSmartASS.Target.SURFACE, sa.target, "SmartASS target");
-            Assert.True(sa.Enabled || Mj.Core.Attitude.Enabled, "attitude controller engaged");
-            ctx.Record("attitudeEnabled", Mj.Core.Attitude.Enabled);
-            yield return Snap.Shot(ctx, "smartass");
-            Mj.SmartAssOff();
-        }
-
         /// <summary>
         /// FAR's prediction API against the aerodynamic moment FAR actually applies, on a plane held at a pitch by
         /// its control surfaces alone (reaction wheels off): in a steady state the true aero pitching moment is
@@ -333,71 +318,6 @@ namespace KspTest.Tests.MechJeb
             foreach (var kv in peakSkin) { ctx.Record(kv.Key + ".peakSkin", Math.Round(kv.Value, 1)); ctx.Record(kv.Key + ".peakInt", Math.Round(peakInt[kv.Key], 1)); ctx.Record(kv.Key + ".farArea", Math.Round(partArea[kv.Key], 3)); }
             try { Mj.SmartAssOff(); } catch (UITestFailure) { }
             Assert.True(holdOk, $"attitude hold stayed within {holdBand} deg of {aoa} deg AoA below 60 km ({holdOutside} of {holdSamples} samples outside, min {aoaMin:F1} max {aoaMax:F1})");
-        }
-
-        [UITest("Mj_AscentToOrbit", Requires = "MechJeb", StartsAt = StartState.Flight, Craft = "UITest_Rocket", TimeoutSec = 1500)]
-        public static IEnumerator Mj_AscentToOrbit(TestContext ctx)
-        {
-            double altKm = ctx.ParamDouble("orbitAltKm", 100);
-            double inc = ctx.ParamDouble("inclination", 0);
-            AscentType? type = null;
-            if (ctx.Param("ascentType") != null) type = (AscentType)System.Enum.Parse(typeof(AscentType), ctx.Param("ascentType"), true);
-            Assert.True(Mj.Present, "vessel has a MechJebCore (MechJebForAll or an MJ part)");
-
-            ctx.Step("Engage ascent guidance");
-            var s = Mj.Core.AscentSettings;
-            if (type == AscentType.PSG)
-            {
-                // PSG flies to DesiredApoapsis too, and MJ only sets OptimizeStageFlag while its PSG settings window is drawn
-                s.DesiredApoapsis.Val = altKm * 1000;
-                s.OptimizeStageFlag = true;
-            }
-            if (ctx.Param("lastStage") != null) s.LastStage.Val = (int)ctx.ParamDouble("lastStage", -1);
-            Mj.Ascent(altKm * 1000, inc, type);   // also stages the rocket off the pad
-            yield return Wait.Until(() => Flight.Altitude > 1000, 180, "liftoff (altitude > 1 km)");
-            if (ctx.Param("warp") != null) Flight.PhysicsWarp(int.Parse(ctx.Param("warp")));   // only once flying: rails warp on the pad locks staging
-            if (ctx.ParamDouble("hyper", 0) > 1 && !Flight.HyperWarp(ctx.ParamDouble("hyper", 0), 1))
-                Log.Warn("hyper-warp refused (TimeControl missing?), flying the ascent at 1x");
-            yield return Snap.Shot(ctx, "liftoff");
-
-            ctx.Step("Wait for orbit");
-            yield return Mj.WaitAscentDone(altKm * 1000, tolM: ctx.ParamDouble("tolKm", 10) * 1000, timeoutSec: ctx.ParamDouble("ascentTimeout", 1200));
-            Flight.HyperWarpOff();
-            Flight.WarpOff();
-            ctx.Record("apoapsisKm", System.Math.Round(Flight.Apoapsis / 1000, 1));
-            ctx.Record("periapsisKm", System.Math.Round(Flight.Periapsis / 1000, 1));
-            ctx.Record("inclination", System.Math.Round(Flight.Inclination, 2));
-            yield return Snap.Shot(ctx, "orbit");
-            Assert.True(Flight.Periapsis > 0, "periapsis above the surface");
-            Assert.Near(inc, Flight.Inclination, 1.0, "inclination");
-            Mj.AscentOff();
-        }
-
-        [UITest("Mj_LandAtLaunchSite", Requires = "MechJeb", StartsAt = StartState.Flight, Craft = "UITest_Rocket", TimeoutSec = 3600)]
-        public static IEnumerator Mj_LandAtLaunchSite(TestContext ctx)
-        {
-            double altKm = ctx.ParamDouble("orbitAltKm", 100);
-            double inc = ctx.ParamDouble("inclination", 0);
-            Assert.True(Mj.Present, "vessel has a MechJebCore (MechJebForAll or an MJ part)");
-            double lat = FlightGlobals.ActiveVessel.latitude;
-            double lon = FlightGlobals.ActiveVessel.longitude;
-            var body = FlightGlobals.ActiveVessel.mainBody;
-
-            ctx.Step("Ascent");
-            Mj.Ascent(altKm * 1000, inc);
-            yield return Wait.Until(() => Flight.Altitude > 1000, 180, "liftoff (altitude > 1 km)");
-            if (ctx.Param("warp") != null) Flight.PhysicsWarp(int.Parse(ctx.Param("warp")));
-            yield return Mj.WaitAscentDone(altKm * 1000, timeoutSec: ctx.ParamDouble("ascentTimeout", 1200));
-            Mj.AscentOff();
-
-            ctx.Step("Landing guidance to the launch site");
-            Mj.LandAt(body, lat, lon);
-            yield return Mj.WaitLanded(ctx.ParamDouble("landingTimeout", 3000));
-            Flight.WarpOff();
-            double dist = Mj.DistanceTo(lat, lon);
-            ctx.Record("distanceToTargetM", System.Math.Round(dist));
-            yield return Snap.Shot(ctx, "landed");
-            Assert.True(dist < ctx.ParamDouble("maxDistanceM", 5000), $"landed within {ctx.ParamDouble("maxDistanceM", 5000)} m of the target ({dist:F0} m)");
         }
     }
 }

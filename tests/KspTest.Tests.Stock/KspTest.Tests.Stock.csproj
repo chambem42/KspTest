@@ -3,7 +3,6 @@
   <PropertyGroup>
     <RootNamespace>KspTest.Tests.Stock</RootNamespace>
     <IsPackable>false</IsPackable>
-    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/KspTest/KspTest.csproj" Private="false" />

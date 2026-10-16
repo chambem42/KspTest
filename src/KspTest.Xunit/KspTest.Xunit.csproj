@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>KspTest.Xunit</RootNamespace>
+    <PackageId>KspTest.Xunit</PackageId>
+    <Description>Run KspTest in-game tests with dotnet test: [KspFact] and Ksp.Run deploy a project's in-game test assemblies, run them in KSP and report through xUnit.</Description>
+    <Nullable>enable</Nullable>
+    <LangVersion>10</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.extensibility.core" Version="2.9.3" />
+    <PackageReference Include="xunit.assert" Version="2.9.3" />
+    <ProjectReference Include="../KspTest.Runner/KspTest.Runner.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="build/KspTest.Xunit.targets" Pack="true" PackagePath="build/;buildTransitive/" />
+  </ItemGroup>
+</Project>

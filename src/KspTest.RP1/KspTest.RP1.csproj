@@ -5,7 +5,12 @@
     <PackageId>KspTest.RP1</PackageId>
     <Description>KspTest integration for RP-1: launches through KCT simulations and drives the KCT and RP-1 windows.</Description>
     <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
+    <!-- compile-time only: the harness itself is deployed into GameData by ksptest, never copied with a test assembly -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="ref/net48/" Visible="false" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../KspTest/KspTest.csproj" Private="false" />
     <Reference Include="RP0" HintPath="$(KspGameData)/RP-1/Plugins/RP0.dll" Private="false" />

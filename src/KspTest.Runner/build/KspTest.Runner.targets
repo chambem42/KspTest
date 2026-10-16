@@ -1,0 +1,8 @@
+<Project>
+  <!-- copies the harness this package carries beside the consumer's output (ksptest/gamedata/KspTest), where
+       Deployer.BundledHarness finds it -->
+  <ItemGroup>
+    <KspTestHarnessFile Include="$(MSBuildThisFileDirectory)../gamedata/KspTest/*" />
+    <None Include="@(KspTestHarnessFile)" Link="ksptest/gamedata/KspTest/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>

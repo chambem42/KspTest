@@ -6,7 +6,12 @@
     <Description>KspTest helpers that drive MechJeb (SmartASS, ascent, landing) from tests of any mod.</Description>
     <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
     <MechJebPath Condition="'$(MechJebPath)' == ''">$(KspGameData)/MechJeb2/Plugins</MechJebPath>
+    <!-- compile-time only: the harness itself is deployed into GameData by ksptest, never copied with a test assembly -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="ref/net48/" Visible="false" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../KspTest/KspTest.csproj" Private="false" />
     <Reference Include="MechJeb2" HintPath="$(MechJebPath)/MechJeb2.dll" Private="false" />

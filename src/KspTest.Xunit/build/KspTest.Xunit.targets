@@ -1,0 +1,14 @@
+<Project>
+  <!-- In a dotnet test project, reference the in-game test project (net48, built against KSP) for its output only:
+         <ProjectReference Include="../X.KspTests/X.KspTests.csproj"
+                           ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="KspTestPlugin" />
+       Its assembly (and .pdb) is copied to ksp-plugins/<assembly name>/ beside the tests, where Ksp.Run deploys it from. -->
+  <Target Name="KspTestCopyPlugins" AfterTargets="Build" Condition="'@(KspTestPlugin)' != ''">
+    <ItemGroup>
+      <_KspTestPluginFile Include="@(KspTestPlugin)" PluginName="%(Filename)" />
+      <_KspTestPluginFile Include="@(KspTestPlugin->'%(RootDir)%(Directory)%(Filename).pdb')" PluginName="%(Filename)"
+                          Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_KspTestPluginFile)" DestinationFolder="$(OutDir)ksp-plugins/%(PluginName)/" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

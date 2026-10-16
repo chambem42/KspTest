@@ -23,6 +23,8 @@
     <Description>In-game automated tests for Kerbal Space Program mods.</Description>
     <RepositoryUrl>https://github.com/chambem42/KspTest</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- the in-game packages are reference-only by design (ref/net48), and the runner carries the harness as content -->
+    <NoWarn>$(NoWarn);NU5100;NU5131</NoWarn>
     <!-- a local feed beside the repo until the packages are published -->
     <PackageOutputPath>$(MSBuildThisFileDirectory)..\nuget-local</PackageOutputPath>
   </PropertyGroup>

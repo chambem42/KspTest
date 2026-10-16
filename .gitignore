@@ -6,3 +6,9 @@ results/
 GameData/*/Plugins/*.dll
 GameData/*/Plugins/*.bak.*
 save-backups/
+results/
+save-backups/
+src/*/bin/
+src/*/obj/
+tests/*/bin/
+tests/*/obj/

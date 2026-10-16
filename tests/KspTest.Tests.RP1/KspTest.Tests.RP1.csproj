@@ -3,7 +3,6 @@
   <PropertyGroup>
     <RootNamespace>KspTest.Tests.RP1</RootNamespace>
     <IsPackable>false</IsPackable>
-    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
     <MechJebPath Condition="'$(MechJebPath)' == ''">$(KspGameData)/MechJeb2/Plugins</MechJebPath>
   </PropertyGroup>
   <ItemGroup>

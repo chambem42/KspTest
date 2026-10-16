@@ -9,7 +9,7 @@ namespace KspTest
     /// The per-run manifest written by run-test.ps1 to GameData/KspTest/PluginData/run.cfg.
     /// Absent file = harness inert. Format (ConfigNode):
     ///
-    ///   KSPUITEST_RUN
+    ///   KSPTEST_RUN
     ///   {
     ///       test = Smoke_MainMenuToVab,Launch_StockButton   // one or more, run in order in this session
     ///       save = uitest              // folder under saves/
@@ -42,7 +42,7 @@ namespace KspTest
             var root = ConfigNode.Load(FilePath);
             // consumed on read: a run the runner did not live to clean up after must not start again on the next launch
             try { File.Delete(FilePath); } catch { }
-            var node = root?.GetNode("KSPUITEST_RUN") ?? root;
+            var node = root?.GetNode("KSPTEST_RUN") ?? root;
             if (node == null) return null;
 
             var cfg = new RunConfig();
