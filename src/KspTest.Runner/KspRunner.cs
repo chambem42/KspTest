@@ -79,8 +79,8 @@ namespace KspTest.Runner
                     proc.WaitForExit(15000);
                 if (proc == null || proc.HasExited)
                 {
+                    tweaks.RestoreSettings();
                     tweaks.RestoreWindow();
-                    tweaks.RestoreVolume();
                 }
 
                 if (File.Exists(install.KspLog))

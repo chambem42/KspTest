@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -16,7 +17,6 @@ namespace KspTest.Runner
         private readonly KspInstall _install;
         private readonly Action<string> _log;
         private string? _quickStartWas;
-        private string? _volumeWas;
         private Dictionary<string, int?>? _windowWas;
 
         private string QuickStartCfg => Path.Combine(_install.GameData, "QuickMods", "QuickStart", "Config.txt");
@@ -48,28 +48,42 @@ namespace KspTest.Runner
             _log("QuickStart config restored");
         }
 
-        /// <summary>KSP reads MASTER_VOLUME from settings.cfg at startup and writes it back on exit: restore once it has exited.</summary>
-        public void Mute()
+        // settings.cfg values changed for the run: KSP reads them at startup and writes the file back on exit, so the
+        // player's are put back once it has exited
+        private readonly Dictionary<string, string> _settingsWas = new Dictionary<string, string>();
+
+        private void SetSetting(string key, string value)
         {
             if (!File.Exists(_install.SettingsCfg))
                 return;
             string text = File.ReadAllText(_install.SettingsCfg);
-            Match m = Regex.Match(text, @"(?m)^MASTER_VOLUME\s*=\s*(\S+)");
+            Match m = Regex.Match(text, $@"(?m)^{key}\s*=[ \t]*(.*?)\s*$");
             if (!m.Success)
                 return;
-            _volumeWas = m.Groups[1].Value;
-            File.WriteAllText(_install.SettingsCfg, Regex.Replace(text, @"(?m)^MASTER_VOLUME\s*=\s*\S+", "MASTER_VOLUME = 0"));
-            _log($"muted (MASTER_VOLUME was {_volumeWas})");
+            if (!_settingsWas.ContainsKey(key))
+                _settingsWas[key] = m.Groups[1].Value;
+            File.WriteAllText(_install.SettingsCfg, Regex.Replace(text, $@"(?m)^{key}\s*=[ \t]*.*?(?=\r?$)", $"{key} = {value}"));
         }
 
-        public void RestoreVolume()
+        /// <summary>The master volume 0 for the run.</summary>
+        public void Mute()
         {
-            if (_volumeWas == null || !File.Exists(_install.SettingsCfg))
+            SetSetting("MASTER_VOLUME", "0");
+            if (_settingsWas.TryGetValue("MASTER_VOLUME", out string? was))
+                _log($"muted (MASTER_VOLUME was {was})");
+        }
+
+        /// <summary>The player's settings.cfg values back, once KSP has exited.</summary>
+        public void RestoreSettings()
+        {
+            if (_settingsWas.Count == 0 || !File.Exists(_install.SettingsCfg))
                 return;
             string text = File.ReadAllText(_install.SettingsCfg);
-            File.WriteAllText(_install.SettingsCfg, Regex.Replace(text, @"(?m)^MASTER_VOLUME\s*=\s*\S+", $"MASTER_VOLUME = {_volumeWas}"));
-            _log($"MASTER_VOLUME restored: {_volumeWas}");
-            _volumeWas = null;
+            foreach (var kv in _settingsWas)
+                text = Regex.Replace(text, $@"(?m)^{kv.Key}\s*=[ \t]*.*?(?=\r?$)", $"{kv.Key} = {kv.Value}");
+            File.WriteAllText(_install.SettingsCfg, text);
+            _log("settings.cfg restored: " + string.Join(", ", _settingsWas.Select(kv => $"{kv.Key} = {kv.Value}")));
+            _settingsWas.Clear();
         }
 
         // Unity's own window prefs (one store shared by every KSP install): the run's size, windowed, set before the launch,
@@ -88,6 +102,12 @@ namespace KspTest.Runner
 
         public void SetWindow(int width, int height)
         {
+            // KSP's own resolution too: started fullscreen at another size, it switched to the run's window as the first
+            // test began, and crashed in the save's texture load right after, three times running
+            SetSetting("SCREEN_RESOLUTION_WIDTH", width.ToString());
+            SetSetting("SCREEN_RESOLUTION_HEIGHT", height.ToString());
+            SetSetting("FULLSCREEN", "False");
+
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return;
             using RegistryKey key = Registry.CurrentUser.CreateSubKey(ScreenKey);
