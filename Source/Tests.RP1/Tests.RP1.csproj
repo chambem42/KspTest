@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <Import Project="..\Common.props" />
+  <PropertyGroup>
+    <ProjectGuid>{D5E6F7A8-B9C0-4D1E-8F2A-3B4C5D6E7F80}</ProjectGuid>
+    <RootNamespace>KSPUITest.Tests.RP1</RootNamespace>
+    <AssemblyName>KSPUITest.Tests.RP1</AssemblyName>
+    <RP0Path Condition=" '$(RP0Path)' == '' ">$(ReferencePath)</RP0Path>
+    <MechJebPath Condition=" '$(MechJebPath)' == '' ">D:\Games\KSP-Vanilla\GameData\MechJeb2\Plugins</MechJebPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="RP0"><HintPath>$(RP0Path)\RP0.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="ROUtils"><HintPath>$(ReferencePath)\ROUtils.dll</HintPath><Private>False</Private></Reference>
+    <!-- only ReentryTests uses MechJeb (SmartASS AoA hold); resolved lazily, so the other tests run without it -->
+    <Reference Include="MechJeb2"><HintPath>$(MechJebPath)\MechJeb2.dll</HintPath><Private>False</Private></Reference>
+    <ProjectReference Include="..\KSPUITest\KSPUITest.csproj">
+      <Project>{7C1D2B4E-5A6F-4E0B-9C3D-1F2A3B4C5D6E}</Project>
+      <Name>KSPUITest</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\KSPUITest.MechJeb\KSPUITest.MechJeb.csproj">
+      <Project>{5E2A7B90-3C1D-4F8E-A6B7-2D3E4F5A6B7C}</Project>
+      <Name>KSPUITest.MechJeb</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\KSPUITest.RP1\KSPUITest.RP1.csproj">
+      <Project>{C4D5E6F7-A8B9-4C0D-9E1F-2A3B4C5D6E7F}</Project>
+      <Name>KSPUITest.RP1</Name>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Rp1Tests.cs" />
+    <Compile Include="ReentryTests.cs" />
+    <Compile Include="SolarTests.cs" />
+    <Compile Include="TrajTests.cs" />
+    <Compile Include="RcsOrbitTests.cs" />
+    <Compile Include="KerbalismTests.cs" />
+    <Compile Include="WaypointTests.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

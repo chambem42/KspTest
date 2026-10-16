@@ -1,0 +1,8 @@
+Source/*/obj/
+Source/*/bin/
+GameData/KSPUITest/Plugins/*.pdb
+GameData/KSPUITest/PluginData/run.cfg
+results/
+GameData/*/Plugins/*.dll
+GameData/*/Plugins/*.bak.*
+save-backups/

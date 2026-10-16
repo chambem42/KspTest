@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <Import Project="..\Common.props" />
+  <PropertyGroup>
+    <ProjectGuid>{C4D5E6F7-A8B9-4C0D-9E1F-2A3B4C5D6E7F}</ProjectGuid>
+    <RootNamespace>KSPUITest.RP1</RootNamespace>
+    <AssemblyName>KSPUITest.RP1</AssemblyName>
+    <!-- RP0.dll: defaults to the flat refs; override with -p:RP0Path=<dir> to build against a branch build -->
+    <RP0Path Condition=" '$(RP0Path)' == '' ">$(ReferencePath)</RP0Path>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="RP0"><HintPath>$(RP0Path)\RP0.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="ROUtils"><HintPath>$(ReferencePath)\ROUtils.dll</HintPath><Private>False</Private></Reference>
+    <ProjectReference Include="..\KSPUITest\KSPUITest.csproj">
+      <Project>{7C1D2B4E-5A6F-4E0B-9C3D-1F2A3B4C5D6E}</Project>
+      <Name>KSPUITest</Name>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Rp1.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

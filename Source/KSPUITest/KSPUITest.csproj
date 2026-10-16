@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <Import Project="..\Common.props" />
+  <PropertyGroup>
+    <ProjectGuid>{7C1D2B4E-5A6F-4E0B-9C3D-1F2A3B4C5D6E}</ProjectGuid>
+    <RootNamespace>KSPUITest</RootNamespace>
+    <AssemblyName>KSPUITest</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Aa.cs" />
+    <Compile Include="Assert.cs" />
+    <Compile Include="Ctrl.cs" />
+    <Compile Include="Cubes.cs" />
+    <Compile Include="Env.cs" />
+    <Compile Include="FarCallWatch.cs" />
+    <Compile Include="FarFlightProbe.cs" />
+    <Compile Include="FarSnapshotApi.cs" />
+    <Compile Include="FarSectionCapture.cs" />
+    <Compile Include="ThreadCanary.cs" />
+    <Compile Include="CallSampler.cs" />
+    <Compile Include="FarStateSnapshot.cs" />
+    <Compile Include="FarSim.cs" />
+    <Compile Include="Flight.cs" />
+    <Compile Include="FlightReplay.cs" />
+    <Compile Include="FlightTrace.cs" />
+    <Compile Include="FrameProfile.cs" />
+    <Compile Include="WingLiveVsSim.cs" />
+    <Compile Include="QueuedTorque.cs" />
+    <Compile Include="RbWrites.cs" />
+    <Compile Include="FrameSpikes.cs" />
+    <Compile Include="AllocSurvey.cs" />
+    <Compile Include="GcWatch.cs" />
+    <Compile Include="WaypointProbe.cs" />
+    <Compile Include="VideoCapture.cs" />
+    <Compile Include="TraceProbe.cs" />
+    <Compile Include="YawProbe.cs" />
+    <Compile Include="PlotShotProbe.cs" />
+    <Compile Include="RcsForceProbe.cs" />
+    <Compile Include="Imgui.cs" />
+    <Compile Include="Json.cs" />
+    <Compile Include="Log.cs" />
+    <Compile Include="Nav.cs" />
+    <Compile Include="Paw.cs" />
+    <Compile Include="Reflect.cs" />
+    <Compile Include="RunConfig.cs" />
+    <Compile Include="Snap.cs" />
+    <Compile Include="Solar.cs" />
+    <Compile Include="TestContext.cs" />
+    <Compile Include="TrajApi.cs" />
+    <Compile Include="TrajEntry.cs" />
+    <Compile Include="TestRunner.cs" />
+    <Compile Include="Ugui.cs" />
+    <Compile Include="UITestAttribute.cs" />
+    <Compile Include="Wait.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
