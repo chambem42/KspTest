@@ -12,3 +12,4 @@ src/*/bin/
 src/*/obj/
 tests/*/bin/
 tests/*/obj/
+GameData/*/Plugins/*.pdb
