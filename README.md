@@ -1,4 +1,4 @@
-# KSPUITest
+# KspTest
 
 In-game automated UI tests for KSP 1.12 (stock, MechJeb, RP-1/KCT). A test launches the game,
 loads a save, walks through scenes, drives windows (PAW, PopupDialog, IMGUI mod windows), flies,
@@ -31,15 +31,15 @@ nothing about the vessel changed. Regenerate with the script in the notes if `rp
 
 | Path | What |
 |---|---|
-| `Source/KSPUITest` | harness core: `TestRunner`, `Nav`, `Wait`, `Ugui`, `Imgui`, `Paw`, `Ctrl`, `Flight`, `Assert`, `Snap` |
-| `Source/KSPUITest.MechJeb` | `Mj` helpers (SmartASS, ascent, landing) - deployed only where MechJeb2.dll exists |
-| `Source/KSPUITest.RP1` | `Rp1` helpers (KCT editor window, Simulation Configuration dialog, RP-1 top window) - deployed only where RP0.dll exists |
+| `Source/KspTest` | harness core: `TestRunner`, `Nav`, `Wait`, `Ugui`, `Imgui`, `Paw`, `Ctrl`, `Flight`, `Assert`, `Snap` |
+| `Source/KspTest.MechJeb` | `Mj` helpers (SmartASS, ascent, landing) - deployed only where MechJeb2.dll exists |
+| `Source/KspTest.RP1` | `Rp1` helpers (KCT editor window, Simulation Configuration dialog, RP-1 top window) - deployed only where RP0.dll exists |
 | `Source/Tests.*` | the tests: `[UITest("Name", Requires = "MechJeb")] public static IEnumerator Name(TestContext ctx)` |
 | `saves/<template>/` | golden saves copied fresh into `<install>\saves\uitest` before every run (see `saves/README.md`) |
 | `run-test.ps1` | runner: refuses if that install is already running, resets the save, disables QuickStart for the run, writes `PluginData/run.cfg`, launches windowed, waits, collects |
 | `deploy.ps1` | msbuild + copy with `.bak` backups |
 
-The harness is inert unless `GameData/KSPUITest/PluginData/run.cfg` exists (the runner creates and
+The harness is inert unless `GameData/KspTest/PluginData/run.cfg` exists (the runner creates and
 deletes it), so the DLLs can stay installed.
 
 ## Sessions and start states

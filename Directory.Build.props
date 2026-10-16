@@ -1,0 +1,29 @@
+<Project>
+  <!-- The KSP install the in-game projects compile against: KSP and Unity assemblies from its Managed folder, and the
+       mods' DLLs the integrations reference from its GameData. Set KspDir with -p:KspDir=... or the KSPDIR
+       environment variable; the default is Steam's install on each OS. -->
+  <PropertyGroup>
+    <KspDir Condition="'$(KspDir)' == ''">$(KSPDIR)</KspDir>
+    <KspDir Condition="'$(KspDir)' == '' And '$(OS)' == 'Windows_NT'">$([System.Environment]::GetEnvironmentVariable('ProgramFiles(x86)'))\Steam\steamapps\common\Kerbal Space Program</KspDir>
+    <KspDir Condition="'$(KspDir)' == '' And Exists('/Library')">$(HOME)/Library/Application Support/Steam/steamapps/common/Kerbal Space Program</KspDir>
+    <KspDir Condition="'$(KspDir)' == ''">$(HOME)/.steam/steam/steamapps/common/Kerbal Space Program</KspDir>
+    <KspData Condition="'$(KspData)' == '' And '$(OS)' == 'Windows_NT'">$(KspDir)\KSP_x64_Data</KspData>
+    <KspData Condition="'$(KspData)' == '' And Exists('$(KspDir)/KSP.app')">$(KspDir)/KSP.app/Contents/Resources/Data</KspData>
+    <KspData Condition="'$(KspData)' == ''">$(KspDir)/KSP_Data</KspData>
+    <KspManaged>$(KspData)/Managed</KspManaged>
+    <KspGameData>$(KspDir)/GameData</KspGameData>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <Deterministic>true</Deterministic>
+    <Version>0.1.0</Version>
+    <Authors>Matt Chambers</Authors>
+    <Description>In-game automated tests for Kerbal Space Program mods.</Description>
+    <RepositoryUrl>https://github.com/chambem42/KspTest</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- a local feed beside the repo until the packages are published -->
+    <PackageOutputPath>$(MSBuildThisFileDirectory)..\nuget-local</PackageOutputPath>
+  </PropertyGroup>
+</Project>

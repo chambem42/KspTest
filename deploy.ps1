@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-  Copies the built KSPUITest DLLs into a KSP install's GameData (backing up what was there).
-  Integration DLLs (KSPUITest.RP1, KSPUITest.MechJeb and their test DLLs) are copied only when the
+  Copies the built KspTest DLLs into a KSP install's GameData (backing up what was there).
+  Integration DLLs (KspTest.RP1, KspTest.MechJeb and their test DLLs) are copied only when the
   mod they reference is present in that install, so nothing type-loads against a missing assembly.
 
 .EXAMPLE
@@ -19,8 +19,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Install = [IO.Path]::GetFullPath($Install)
-$src = Join-Path $here 'GameData\KSPUITest\Plugins'
-$dst = Join-Path $Install 'GameData\KSPUITest\Plugins'
+$src = Join-Path $here 'GameData\KspTest\Plugins'
+$dst = Join-Path $Install 'GameData\KspTest\Plugins'
 if (-not (Test-Path (Join-Path $Install 'KSP_x64.exe'))) { throw "not a KSP install: $Install" }
 
 $running = Get-Process -Name KSP_x64 -ErrorAction SilentlyContinue | Where-Object { try { $_.Path -like "$Install\*" } catch { $false } }
@@ -28,8 +28,8 @@ if ($running) { throw "KSP is running from $Install; plugins are only loaded at 
 
 if ($Build) {
     $projects = @('Source\Tests.Stock\Tests.Stock.csproj')
-    foreach ($p in @('Source\KSPUITest.MechJeb\KSPUITest.MechJeb.csproj', 'Source\Tests.MechJeb\Tests.MechJeb.csproj',
-                     'Source\KSPUITest.RP1\KSPUITest.RP1.csproj', 'Source\Tests.RP1\Tests.RP1.csproj')) {
+    foreach ($p in @('Source\KspTest.MechJeb\KspTest.MechJeb.csproj', 'Source\Tests.MechJeb\Tests.MechJeb.csproj',
+                     'Source\KspTest.RP1\KspTest.RP1.csproj', 'Source\Tests.RP1\Tests.RP1.csproj')) {
         if (Test-Path (Join-Path $here $p)) { $projects += $p }
     }
     foreach ($p in $projects) {
@@ -47,14 +47,14 @@ if ($Build) {
 $hasRp1 = Test-Path (Join-Path $Install 'GameData\RP-1\Plugins\RP0.dll')
 $hasMj  = Test-Path (Join-Path $Install 'GameData\MechJeb2\Plugins\MechJeb2.dll')
 $requires = @{
-    'KSPUITest.RP1.dll'           = $hasRp1
-    'KSPUITest.Tests.RP1.dll'     = $hasRp1
-    'KSPUITest.MechJeb.dll'       = $hasMj
-    'KSPUITest.Tests.MechJeb.dll' = $hasMj
+    'KspTest.RP1.dll'           = $hasRp1
+    'KspTest.Tests.RP1.dll'     = $hasRp1
+    'KspTest.MechJeb.dll'       = $hasMj
+    'KspTest.Tests.MechJeb.dll' = $hasMj
 }
 
 New-Item -ItemType Directory -Force $dst | Out-Null
-New-Item -ItemType Directory -Force (Join-Path $Install 'GameData\KSPUITest\PluginData') | Out-Null
+New-Item -ItemType Directory -Force (Join-Path $Install 'GameData\KspTest\PluginData') | Out-Null
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 foreach ($f in Get-ChildItem $src -Filter '*.dll') {
     if ($requires.ContainsKey($f.Name) -and -not $requires[$f.Name]) {

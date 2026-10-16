@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Runs one or more in-game KSPUITest tests in a single KSP session: resets the test save, writes run.cfg, launches KSP, waits for
+  Runs one or more in-game KspTest tests in a single KSP session: resets the test save, writes run.cfg, launches KSP, waits for
   it to exit, collects result.json / screenshots / KSP.log and returns a non-zero exit code on failure.
 
 .EXAMPLE
@@ -15,9 +15,9 @@
 param(
     [Parameter(Mandatory = $true)] [string] $Test,
     [string] $Install = 'D:\Games\KSP-Vanilla',
-    # golden save template under KSPUITest\saves\<Save>, copied fresh into <Install>\saves\<SaveFolder>
+    # golden save template under KspTest\saves\<Save>, copied fresh into <Install>\saves\<SaveFolder>
     [string] $Save = 'stock-sandbox',
-    [string] $SaveFolder = 'uitest',
+    [string] $SaveFolder = 'ksptest',
     [switch] $NoReset,          # reuse <Install>\saves\<SaveFolder> as-is
     [int] $TimeoutSec = 900,
     [switch] $Keep,             # leave KSP open after the test (quitWhenDone = false)
@@ -58,7 +58,7 @@ $running = Get-Process -Name KSP_x64 -ErrorAction SilentlyContinue | Where-Objec
 # (it is waited for below, like any running KSP: queued runs of the same install follow each other)
 if ($running) { Write-Host "KSP is already running from $Install (PID $($running.Id -join ',')); waiting for it to exit" }
 
-$harnessDll = Join-Path $Install 'GameData\KSPUITest\Plugins\KSPUITest.dll'
+$harnessDll = Join-Path $Install 'GameData\KspTest\Plugins\KspTest.dll'
 if (-not (Test-Path $harnessDll)) { throw "harness not deployed into $Install (run deploy.ps1 -Install '$Install')" }
 
 # --- one KSP at a time on this machine (two modded RSS games at once ran the GPU out of memory): wait while any KSP
@@ -178,7 +178,7 @@ if (Test-Path $qsCfg) {
 }
 
 # --- run manifest ---
-$runCfgDir = Join-Path $Install 'GameData\KSPUITest\PluginData'
+$runCfgDir = Join-Path $Install 'GameData\KspTest\PluginData'
 New-Item -ItemType Directory -Force $runCfgDir | Out-Null
 $runCfg = Join-Path $runCfgDir 'run.cfg'
 $paramLines = ($Params.GetEnumerator() | ForEach-Object { "        $($_.Key) = $($_.Value)" }) -join "`r`n"
@@ -276,7 +276,7 @@ try {
                 }
             }
             if (-not $begun -and (Test-Path $kspLogLive) -and (Get-Item $kspLogLive).LastWriteTime -gt $proc.StartTime -and
-                (Select-String -Path $kspLogLive -Pattern '[KSPUITest] ==== TEST' -SimpleMatch -Quiet)) { $begun = $true }
+                (Select-String -Path $kspLogLive -Pattern '[KspTest] ==== TEST' -SimpleMatch -Quiet)) { $begun = $true }
             $quiet = ((Get-Date) - $lastWrite).TotalSeconds
             if (-not $begun -and $quiet -gt $LoadStallSec) {
                 Write-Warning "KSP hung while loading (KSP.log silent since $($lastWrite.ToString('HH:mm:ss'))); killing PID $($proc.Id)"
@@ -370,9 +370,9 @@ if (Test-Path $resultFile) {
     if (Test-Path $logCopy) {
         $inRun = $false; $exc = @()
         foreach ($line in [IO.File]::ReadLines($logCopy)) {
-            if ($line -match '\[KSPUITest\] BEGIN') { $inRun = $true }
+            if ($line -match '\[KspTest\] BEGIN') { $inRun = $true }
             elseif ($inRun -and $line -match 'Exception') { $exc += $line }
-            if ($line -match '\[KSPUITest\] END') { break }
+            if ($line -match '\[KspTest\] END') { break }
         }
         if ($exc.Count -gt 0) {
             Write-Host "  exceptions in KSP.log during the run: $($exc.Count) (first: $($exc[0].Trim()))"

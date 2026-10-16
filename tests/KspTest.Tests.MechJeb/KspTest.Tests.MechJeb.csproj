@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <RootNamespace>KspTest.Tests.MechJeb</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
+    <MechJebPath Condition="'$(MechJebPath)' == ''">$(KspGameData)/MechJeb2/Plugins</MechJebPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/KspTest/KspTest.csproj" Private="false" />
+    <ProjectReference Include="../../src/KspTest.MechJeb/KspTest.MechJeb.csproj" Private="false" />
+    <Reference Include="MechJeb2" HintPath="$(MechJebPath)/MechJeb2.dll" Private="false" />
+    <Reference Include="MechJebLib" HintPath="$(MechJebPath)/MechJebLib.dll" Private="false" />
+  </ItemGroup>
+</Project>

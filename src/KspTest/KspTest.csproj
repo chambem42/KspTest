@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <RootNamespace>KspTest</RootNamespace>
+    <PackageId>KspTest</PackageId>
+    <Description>In-game test harness for Kerbal Space Program mods: runs [UITest] methods in a game session, drives scenes, windows and flight, and reports to the KspTest runner.</Description>
+    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
+  </PropertyGroup>
+</Project>

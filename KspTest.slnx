@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KspTest.MechJeb/KspTest.MechJeb.csproj" />
+    <Project Path="src/KspTest.RP1/KspTest.RP1.csproj" />
+    <Project Path="src/KspTest/KspTest.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KspTest.Tests.MechJeb/KspTest.Tests.MechJeb.csproj" />
+    <Project Path="tests/KspTest.Tests.RP1/KspTest.Tests.RP1.csproj" />
+    <Project Path="tests/KspTest.Tests.Stock/KspTest.Tests.Stock.csproj" />
+  </Folder>
+</Solution>

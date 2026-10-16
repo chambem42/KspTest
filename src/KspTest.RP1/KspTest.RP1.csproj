@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <RootNamespace>KspTest.RP1</RootNamespace>
+    <PackageId>KspTest.RP1</PackageId>
+    <Description>KspTest integration for RP-1: launches through KCT simulations and drives the KCT and RP-1 windows.</Description>
+    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KspTest/KspTest.csproj" Private="false" />
+    <Reference Include="RP0" HintPath="$(KspGameData)/RP-1/Plugins/RP0.dll" Private="false" />
+    <Reference Include="ROUtils" HintPath="$(KspGameData)/ROUtils/Plugins/ROUtils.dll" Private="false" />
+  </ItemGroup>
+</Project>
