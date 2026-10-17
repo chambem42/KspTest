@@ -28,10 +28,11 @@ namespace KspTest.Runner
             harnessDir ??= BundledHarness;
             if (!Directory.Exists(harnessDir))
                 throw new DirectoryNotFoundException($"no harness to deploy at {harnessDir}");
-            // KspTest's predecessor hooks the same scenes and windows; the two in one game fight over them
+            // KspTest's predecessor: each harness stays inert (no patches, no scene changes) without its own run.cfg, so
+            // the two can share an install as long as only one is given a run at a time
             string old = Path.Combine(install.GameData, "KSPUITest");
             if (Directory.Exists(old))
-                throw new InvalidOperationException($"{old} is KspTest's predecessor; move it out of GameData before deploying KspTest");
+                log($"note: {old} (KspTest's predecessor) is installed too; it stays inert during KspTest runs");
             string plugins = Path.Combine(install.HarnessDir, "Plugins");
             Directory.CreateDirectory(plugins);
             Directory.CreateDirectory(Path.Combine(install.HarnessDir, "PluginData"));
