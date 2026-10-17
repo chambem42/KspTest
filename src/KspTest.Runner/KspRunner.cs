@@ -35,13 +35,11 @@ namespace KspTest.Runner
             string resultsDir = Path.GetFullPath(Path.Combine(o.ResultsRoot, $"{DateTime.Now:yyyyMMdd-HHmmss}-{label}"));
             Directory.CreateDirectory(resultsDir);
 
+            string save = Path.Combine(install.Saves, o.SaveFolder);
             if (!o.NoReset && o.Test != "list")
-            {
-                if (o.SaveTemplate == null)
-                    throw new ArgumentException("a save template is needed (or NoReset)");
-                SaveReset.Reset(o.SaveTemplate, Path.Combine(install.Saves, o.SaveFolder),
-                    o.SaveBackupRoot ?? Path.Combine(o.ResultsRoot, "..", "save-backups"), o.SaveFolder, log);
-            }
+                SaveReset.Reset(o.SaveTemplate, save, o.SaveBackupRoot ?? Path.Combine(o.ResultsRoot, "..", "save-backups"), o.SaveFolder, log);
+            if (o.Crafts.Count > 0)
+                SaveReset.PlaceCrafts(o.Crafts, save, log);
 
             if (SystemMemory.Commit() is (double used, double limit))
                 log($"system commit {used:F1}/{limit:F1} GB ({limit - used:F1} GB free for KSP)");
@@ -105,7 +103,7 @@ namespace KspTest.Runner
         {
             var sb = new StringBuilder();
             sb.Append("KSPTEST_RUN\r\n{\r\n");
-            sb.Append($"    test = {o.Test}\r\n    save = {o.SaveFolder}\r\n    resultsDir = {resultsDir}\r\n");
+            sb.Append($"    test = {o.Test}\r\n    save = {o.SaveFolder}\r\n    newGame = {o.NewGame}\r\n    resultsDir = {resultsDir}\r\n");
             sb.Append($"    timeoutSec = {o.TimeoutSec}\r\n    quitWhenDone = {(o.Keep ? "false" : "true")}\r\n");
             sb.Append($"    width = {o.Width}\r\n    height = {o.Height}\r\n    PARAMS\r\n    {{\r\n");
             foreach (var kv in o.Params)

@@ -10,5 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="ref/net48/" Visible="false" />
+    <None Include="build/KspTest.targets" Pack="true" PackagePath="build/" />
   </ItemGroup>
 </Project>

@@ -12,7 +12,8 @@ namespace KspTest
     ///   KSPTEST_RUN
     ///   {
     ///       test = Smoke_MainMenuToVab,Launch_StockButton   // one or more, run in order in this session
-    ///       save = uitest              // folder under saves/
+    ///       save = ksptest             // folder under saves/
+    ///       newGame = sandbox          // without a persistent.sfs there, a new game of this mode (sandbox, science, career)
     ///       resultsDir = C:\...\results\20260913-0142-Smoke_MainMenuToVab
     ///       timeoutSec = 600
     ///       quitWhenDone = true
@@ -29,6 +30,7 @@ namespace KspTest
         public string Test;
         public readonly List<string> Tests = new List<string>();
         public string Save = "ksptest";
+        public string NewGame = "sandbox";
         public string ResultsDir;
         public double TimeoutSec = 600;
         public bool QuitWhenDone = true;
@@ -50,6 +52,7 @@ namespace KspTest
             foreach (var t in (cfg.Test ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
                 cfg.Tests.Add(t.Trim());
             if (node.HasValue("save")) cfg.Save = node.GetValue("save");
+            if (node.HasValue("newGame")) cfg.NewGame = node.GetValue("newGame");
             cfg.ResultsDir = node.GetValue("resultsDir");
             if (node.HasValue("timeoutSec")) cfg.TimeoutSec = double.Parse(node.GetValue("timeoutSec"), CultureInfo.InvariantCulture);
             if (node.HasValue("quitWhenDone")) cfg.QuitWhenDone = bool.Parse(node.GetValue("quitWhenDone"));

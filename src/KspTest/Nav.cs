@@ -26,7 +26,11 @@ namespace KspTest
             yield return Wait.Seconds(1.0);
 
             string sfs = Path.Combine(KSPUtil.ApplicationRootPath, "saves", saveFolder, "persistent.sfs");
-            if (!File.Exists(sfs)) throw new UITestFailure("save not found: " + sfs);
+            if (!File.Exists(sfs))
+            {
+                yield return NewGame(saveFolder, ctx.Config.NewGame, dismissPopups);
+                yield break;
+            }
             Log.Info($"loading save '{saveFolder}'");
 
             var node = GamePersistence.LoadSFSFile("persistent", saveFolder);
@@ -55,6 +59,42 @@ namespace KspTest
                 yield return null;
             }
             Log.Info("space center loaded");
+        }
+
+        /// <summary>
+        /// Main menu -> Space Center in a new game in saves/saveFolder, as the main menu's New Game makes one (normal
+        /// difficulty, the default flag). Crafts already in the folder's Ships stay: the runner puts a test's crafts there.
+        /// </summary>
+        public static IEnumerator NewGame(string saveFolder, string mode = "sandbox", bool dismissPopups = true)
+        {
+            Game.Modes m;
+            switch ((mode ?? "sandbox").ToLowerInvariant())
+            {
+                case "sandbox": m = Game.Modes.SANDBOX; break;
+                case "science": case "science_sandbox": m = Game.Modes.SCIENCE_SANDBOX; break;
+                case "career": m = Game.Modes.CAREER; break;
+                default: throw new UITestFailure($"newGame '{mode}': sandbox, science or career");
+            }
+            Log.Info($"no save in '{saveFolder}': starting a new {m} game");
+
+            var parameters = GameParameters.GetDefaultParameters(m, GameParameters.Preset.Normal);
+            HighLogic.CurrentGame = GamePersistence.CreateNewGame(saveFolder, m, parameters, "Squad/Flags/default", GameScenes.SPACECENTER, EditorFacility.VAB);
+            HighLogic.SaveFolder = saveFolder;
+            Directory.CreateDirectory(Path.Combine(KSPUtil.ApplicationRootPath, "saves", saveFolder, "Ships", "VAB"));
+            Directory.CreateDirectory(Path.Combine(KSPUtil.ApplicationRootPath, "saves", saveFolder, "Ships", "SPH"));
+            GameEvents.onGameNewStart.Fire();
+            HighLogic.CurrentGame.Start();
+            InputLockManager.ClearControlLocks();
+
+            yield return Wait.Scene(GameScenes.SPACECENTER, 600);
+            yield return Wait.Seconds(1.0);
+            if (dismissPopups && Ugui.OpenPopups().Count > 0)
+            {
+                Ugui.DismissPopups();
+                yield return null;
+            }
+            GamePersistence.SaveGame("persistent", saveFolder, SaveMode.OVERWRITE);
+            Log.Info("space center loaded (new game)");
         }
 
         /// <summary>Space Center -> editor, optionally loading a craft (absolute path) on entry.</summary>

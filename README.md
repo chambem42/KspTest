@@ -22,29 +22,48 @@ Packed into `../nuget-local` (a `NuGet.Config` in the parent folder points every
 A mod keeps its tests in two projects of its own; the mod itself never references KspTest.
 
 1. **In-game tests** (net48, loaded by KSP): reference `KspTest` (and `KspTest.MechJeb` / `KspTest.RP1` if
-   needed), the mod, and KSP's assemblies, none copied to the output:
+   needed). The `KspTest` package references KSP's and Unity's assemblies from the install in `KspDir` (or the
+   `KSPDIR` environment variable, or `KspData`), none copied to the output; set `KspTestKspReferences` to false to
+   reference them yourself.
 
    ```csharp
    [UITest("Mj_AscentToOrbit", Requires = "MechJeb", StartsAt = StartState.Flight, Craft = "UITest_Rocket")]
    public static IEnumerator Mj_AscentToOrbit(TestContext ctx) { ... }
    ```
 
-2. **`dotnet test` project** (net8.0, xUnit): reference `KspTest.Xunit`, and the in-game project for its output only:
+   Keep tests that use `KspTest.MechJeb` or `KspTest.RP1` in an assembly of their own: KSP drops an assembly whose
+   types do not load, so one that needs MechJeb must not go into an install without it.
+
+2. **`dotnet test` project** (net8.0, xUnit): reference `KspTest.Xunit`, and the in-game projects for their output
+   only, each with the files under GameData it needs (`KspRequires`; without them it isn't deployed):
 
    ```xml
    <ProjectReference Include="../X.KspTests/X.KspTests.csproj"
                      ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="KspTestPlugin" />
+   <ProjectReference Include="../X.KspTests.MechJeb/X.KspTests.MechJeb.csproj"
+                     ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="KspTestPlugin"
+                     KspRequires="MechJeb2/Plugins/MechJeb2.dll" />
+   <KspTestCraft Include="crafts/*.craft" />
    ```
 
    ```csharp
    [KspFact]
-   public void AscentToOrbit() => Ksp.Run(output, "Mj_AscentToOrbit", "orbitAltKm=250;ascentType=PSG", save: "rp1-career");
+   public void PlaneCruise() => Ksp.Run(output, "X_Cruise", "altM=3000");          // a new sandbox game
+   [KspFact(Requires = "MechJeb2/Plugins/MechJeb2.dll")]
+   public void AscentToOrbit() => Ksp.Run(output, "Mj_AscentToOrbit", "orbitAltKm=250", save: "rp1-career");
    ```
 
-   Settings come from `ksptest.json` beside the test assembly or the environment (`KSPDIR`, `KSPTEST_SAVES`,
-   `KSPTEST_RESULTS`, `KSPTEST_LOCK_FILE`, `KSPTEST_MUTE`). With no install configured every `[KspFact]` is skipped.
+   Without a `save` template the run starts a new game (`RunOptions.NewGame`: sandbox, science or career) in an
+   emptied `saves/ksptest`, the way the main menu's New Game does; the project's `KspTestCraft`s go into its SPH or
+   VAB first. Test classes run one after another (the package's `xunit.runner.json`).
 
-MechJeb2's `MechJebKspTest` and `MechJebKspTestRun` are a worked example.
+   Settings come from `ksptest.json` beside the test assembly or the environment, which wins: `install` (`KSPDIR`),
+   `saves` (`KSPTEST_SAVES`), `results` (`KSPTEST_RESULTS`), `lockFile` (`KSPTEST_LOCK_FILE`), `mute`
+   (`KSPTEST_MUTE`), `crafts` (`KSPTEST_CRAFTS`, `;` separated: more crafts for every run) and `params`
+   (`KSPTEST_PARAMS`: parameters over the tests' own), so anyone can fly a mod's tests on their own crafts. With no
+   install configured every `[KspFact]` is skipped.
+
+MechJeb2's `MechJebKspTest` and `MechJebKspTestRun`, and FAR's `KspTests/`, are worked examples.
 
 ## ksptest
 
@@ -53,6 +72,7 @@ dotnet tool install -g KspTest.Tool        # from the local feed
 ksptest deploy --install DIR --tests MechJebKspTest=path/MechJebKspTest.dll
 ksptest list --install DIR
 ksptest run Mj_LaunchToRendezvous --install DIR --save rp1-career --saves DIR --params "targetInc=45;hohmann=off" --mute
+ksptest run Far_ArCruise --install DIR --new-game sandbox --craft "my crafts" --params "crafts=My Plane"
 ```
 
 Only one KSP runs at a time on a machine: every run waits while any KSP is running or another launcher holds the
@@ -74,7 +94,7 @@ with their labels/buttons/fields, input locks, log tail).
 |---|---|
 | `src/KspTest*` | the packages above |
 | `tests/` | the harness's own tests, and tests still waiting to move to their mods' repos |
-| `saves/<template>/` | save templates copied fresh into `<install>/saves/ksptest` before every run (see `saves/README.md`) |
+| `saves/<template>/` | save templates copied fresh into `<install>/saves/ksptest` before a run that names one (see `saves/README.md`); without one the run starts a new game |
 | `GameData/KspTest/` | the harness as deployed (built here) |
 
 The harness is inert unless `GameData/KspTest/PluginData/run.cfg` exists (the runner creates and
@@ -88,7 +108,7 @@ where it expects to start - `StartsAt = StartState.SpaceCenter | Vab | Sph | Fli
 wherever the previous test finished: same craft already in that editor -> nothing; same craft in
 flight -> revert to launch; a vessel left on the pad -> recovered; otherwise via the Space Center.
 `StartState.Any` means the test navigates itself. Game state (the save) carries over between tests
-by design; the runner resets it from the save template once per session.
+by design; the runner resets it from the save template (or empties it for a new game) once per session.
 
 An on-screen box (bottom-left) shows the running test, its current step and what it is waiting for.
 
@@ -130,7 +150,8 @@ public static IEnumerator Kct_SimConfig_Circular(TestContext ctx)
   `vessel.OnFlyByWire` (or `OnPostAutopilotUpdate` with `overrideAutopilots: true`).
 - **Mj**: `SmartAss(target)`, `SmartAssSurface(hdg, pitch)`, `Ascent(altM, inc)`, `WaitAscentDone`,
   `LandAt(body, lat, lon)`, `LandSomewhere()`, `WaitLanded`, `DistanceTo`.
-- **Nav**: `LoadSave`, `EnterEditor(facility, craft)`, `LoadCraft`, `Launch()` (stock Launch button,
+- **Nav**: `LoadSave` (a new game when the save folder has none), `NewGame(folder, mode)`,
+  `EnterEditor(facility, craft)`, `LoadCraft`, `Launch()` (stock Launch button,
   or the KCT simulation dialog when RP-1 is loaded), `RevertToEditor`, `ToSpaceCenter`.
 - **Flight**: telemetry, `Warp`, `WarpTo`, `Unpause`, `ClearLocks`, `AssertAlive`.
 
@@ -151,6 +172,7 @@ dotnet pack KspTest.slnx -c Release                       # into ../nuget-local
 
 SDK-style projects. The in-game ones are net48 against the KSP install set by `KspDir` (the `KSPDIR`
 environment variable, else Steam's install on each OS): KSP and Unity from its Managed folder, MechJeb
-(`MechJebPath`) and RP-1 from its GameData. MechJeb builds differ between installs (`VesselState.thrustAvailable`
-vs `ThrustAvailable`), so build against the install the tests run in; the RP-1 helpers use reflection for
-branch-only fields so they compile against any RP0.
+(`MechJebPath`) and RP-1 from its GameData. The harness reaches every other mod (FAR, AtmosphereAutopilot,
+Trajectories, B9 procedural wings) by reflection, so it loads and its probes skip where a mod is absent.
+MechJeb builds differ between installs (`VesselState.thrustAvailable` vs `ThrustAvailable`), so build against the
+install the tests run in; the RP-1 helpers use reflection for branch-only fields so they compile against any RP0.

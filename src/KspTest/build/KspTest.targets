@@ -1,0 +1,34 @@
+<Project>
+  <!-- An in-game test project is built against the KSP install it runs in: KspDir (or the KSPDIR environment variable)
+       is its root, or KspData its data folder, and KSP's and Unity's assemblies are referenced from it, none copied to
+       the output. A project that references them itself sets KspTestKspReferences to false; KspManaged overrides the
+       Managed folder. -->
+  <PropertyGroup>
+    <KspTestKspReferences Condition="'$(KspTestKspReferences)' == ''">true</KspTestKspReferences>
+    <KspManaged Condition="'$(KspManaged)' == '' and '$(KspData)' != '' and Exists('$(KspData)/Managed')">$(KspData)/Managed</KspManaged>
+    <KspManaged Condition="'$(KspManaged)' == '' and '$(KspDir)' != '' and Exists('$(KspDir)/KSP_x64_Data/Managed')">$(KspDir)/KSP_x64_Data/Managed</KspManaged>
+    <KspManaged Condition="'$(KspManaged)' == '' and '$(KspDir)' != '' and Exists('$(KspDir)/KSP_Data/Managed')">$(KspDir)/KSP_Data/Managed</KspManaged>
+    <KspManaged Condition="'$(KspManaged)' == '' and '$(KspDir)' != '' and Exists('$(KspDir)/KSP.app/Contents/Resources/Data/Managed')">$(KspDir)/KSP.app/Contents/Resources/Data/Managed</KspManaged>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(KspTestKspReferences)' == 'true' and '$(KspManaged)' != ''">
+    <Reference Include="Assembly-CSharp" HintPath="$(KspManaged)/Assembly-CSharp.dll" Private="false" />
+    <Reference Include="Assembly-CSharp-firstpass" HintPath="$(KspManaged)/Assembly-CSharp-firstpass.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(KspManaged)/UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(KspManaged)/UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AnimationModule" HintPath="$(KspManaged)/UnityEngine.AnimationModule.dll" Private="false" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(KspManaged)/UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(KspManaged)/UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(KspManaged)/UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(KspManaged)/UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ScreenCaptureModule" HintPath="$(KspManaged)/UnityEngine.ScreenCaptureModule.dll" Private="false" />
+    <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(KspManaged)/UnityEngine.TextRenderingModule.dll" Private="false" />
+    <Reference Include="UnityEngine.UI" HintPath="$(KspManaged)/UnityEngine.UI.dll" Private="false" />
+    <Reference Include="UnityEngine.UIModule" HintPath="$(KspManaged)/UnityEngine.UIModule.dll" Private="false" />
+  </ItemGroup>
+
+  <Target Name="KspTestCheckKsp" BeforeTargets="ResolveAssemblyReferences"
+          Condition="'$(KspTestKspReferences)' == 'true' and '$(KspManaged)' == ''">
+    <Error Text="KspTest: no KSP install to build against. Set KspDir (a property, or the KSPDIR environment variable) to your KSP folder." />
+  </Target>
+</Project>

@@ -2,7 +2,16 @@
   <!-- In a dotnet test project, reference the in-game test project (net48, built against KSP) for its output only:
          <ProjectReference Include="../X.KspTests/X.KspTests.csproj"
                            ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="KspTestPlugin" />
-       Its assembly (and .pdb) is copied to ksp-plugins/<assembly name>/ beside the tests, where Ksp.Run deploys it from. -->
+       Its assembly (and .pdb) is copied to ksp-plugins/<assembly name>/ beside the tests, where Ksp.Run deploys it from.
+       With KspRequires="MechJeb2/Plugins/MechJeb2.dll" (files under GameData, ; separated) it is deployed only into installs
+       that have them: an assembly built against a mod's helpers must not load without that mod.
+       Crafts the tests fly, <KspTestCraft Include="crafts/*.craft" />, are copied to ksp-crafts/, and Ksp.Run puts them
+       into every run's save. -->
+  <!-- one KSP at a time: test classes run one after another (a project's own xunit.runner.json wins) -->
+  <ItemGroup Condition="!Exists('$(MSBuildProjectDirectory)/xunit.runner.json')">
+    <None Include="$(MSBuildThisFileDirectory)xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
   <Target Name="KspTestCopyPlugins" AfterTargets="Build" Condition="'@(KspTestPlugin)' != ''">
     <ItemGroup>
       <_KspTestPluginFile Include="@(KspTestPlugin)" PluginName="%(Filename)" />
@@ -10,5 +19,12 @@
                           Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
     </ItemGroup>
     <Copy SourceFiles="@(_KspTestPluginFile)" DestinationFolder="$(OutDir)ksp-plugins/%(PluginName)/" SkipUnchangedFiles="true" />
+    <!-- KspRequires="MechJeb2/Plugins/MechJeb2.dll;...": files under GameData without which the assembly is not deployed -->
+    <WriteLinesToFile File="$(OutDir)ksp-plugins/%(KspTestPlugin.Filename)/ksp-requires.txt" Lines="%(KspTestPlugin.KspRequires)"
+                      Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <Target Name="KspTestCopyCrafts" AfterTargets="Build" Condition="'@(KspTestCraft)' != ''">
+    <Copy SourceFiles="@(KspTestCraft)" DestinationFolder="$(OutDir)ksp-crafts/" SkipUnchangedFiles="true" />
   </Target>
 </Project>

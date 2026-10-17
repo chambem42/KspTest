@@ -7,7 +7,7 @@ using KspTest.Runner;
 namespace KspTest.Tool
 {
     /// <summary>
-    ///     ksptest run &lt;tests&gt; --install DIR [--save NAME|DIR] [--saves DIR] [--params "k=v;k=v"] [--keep] [--mute] ...
+    ///     ksptest run &lt;tests&gt; --install DIR [--save NAME|DIR | --new-game MODE] [--craft FILE|DIR]... [--saves DIR] [--params "k=v;k=v"] [--keep] [--mute] ...
     ///     ksptest list --install DIR
     ///     ksptest deploy --install DIR [--harness DIR] [--tests NAME=DLL[,DLL...]]
     /// </summary>
@@ -69,12 +69,16 @@ namespace KspTest.Tool
                 LockFile = a.Flags.Contains("no-lock") ? null : a.Get("lock") ?? DefaultLockFile,
             }.WithParams(a.Get("params"));
 
-            if (!o.NoReset)
+            if (a.Get("new-game") is string mode)
+                o.NewGame = mode;   // no template: an emptied save the harness starts a new game in
+            else if (!o.NoReset)
             {
                 // a template folder, or its name under --saves (default ./saves)
                 string save = a.Get("save") ?? "stock-sandbox";
                 o.SaveTemplate = Directory.Exists(save) ? save : Path.Combine(a.Get("saves") ?? "saves", save);
             }
+
+            o.Crafts.AddRange(a.All("craft"));
 
             RunResult r = KspRunner.Run(o);
             Console.WriteLine();
@@ -113,6 +117,8 @@ namespace KspTest.Tool
   ksptest run <tests> --install DIR [options]   tests: names, comma separated, wildcards allowed, or 'all'
       --save NAME|DIR        save template copied fresh into saves/ksptest (a folder, or its name under --saves)
       --saves DIR            where named templates are (default ./saves)
+      --new-game MODE        no template: a new sandbox, science or career game
+      --craft FILE|DIR       crafts put into the save's Ships/VAB or SPH (repeatable)
       --params ""k=v;k=v""     test parameters
       --timeout SEC          the harness's budget (default 900)     --keep        leave KSP open afterwards
       --mute                 master volume 0 for the run            --no-reset    play in saves/ksptest as it is

@@ -12,8 +12,17 @@ namespace KspTest.Runner
         /// <summary>The KSP install (its root folder).</summary>
         public string Install = "";
 
-        /// <summary>Save template folder copied fresh into the install's saves/&lt;SaveFolder&gt; before the run; null with NoReset.</summary>
+        /// <summary>
+        ///     Save template folder copied fresh into the install's saves/&lt;SaveFolder&gt; before the run; null: the folder
+        ///     emptied, and the harness starts a NewGame there.
+        /// </summary>
         public string? SaveTemplate;
+
+        /// <summary>The mode of the game started without a SaveTemplate: sandbox, science or career.</summary>
+        public string NewGame = "sandbox";
+
+        /// <summary>Crafts (.craft files, or folders of them) put into the save's Ships/VAB or SPH after the reset.</summary>
+        public List<string> Crafts = new List<string>();
 
         /// <summary>The install's save folder the tests play in.</summary>
         public string SaveFolder = "ksptest";

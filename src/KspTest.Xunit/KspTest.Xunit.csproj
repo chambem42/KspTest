@@ -14,5 +14,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="build/KspTest.Xunit.targets" Pack="true" PackagePath="build/;buildTransitive/" />
+    <None Include="build/xunit.runner.json" Pack="true" PackagePath="build/;buildTransitive/" />
   </ItemGroup>
 </Project>

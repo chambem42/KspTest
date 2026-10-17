@@ -37,11 +37,17 @@ namespace KspTest
         public string SaveFolder => Config.Save;
         public string SaveDir => Path.Combine(KSPUtil.ApplicationRootPath, "saves", Config.Save);
 
-        /// <summary>Absolute path of a craft in the test save (Ships/VAB by default).</summary>
+        /// <summary>
+        /// Absolute path of a craft: a path as it is, else the test save's Ships/subfolder (VAB by default), else the
+        /// game's own Ships/subfolder (the stock crafts) when only that has it.
+        /// </summary>
         public string CraftPath(string name, string subfolder = "VAB")
         {
             if (!name.EndsWith(".craft", StringComparison.OrdinalIgnoreCase)) name += ".craft";
-            return Path.GetFullPath(Path.Combine(SaveDir, "Ships", subfolder, name));
+            if (Path.IsPathRooted(name)) return Path.GetFullPath(name);
+            string inSave = Path.GetFullPath(Path.Combine(SaveDir, "Ships", subfolder, name));
+            string stock = Path.GetFullPath(Path.Combine(KSPUtil.ApplicationRootPath, "Ships", subfolder, name));
+            return !File.Exists(inSave) && File.Exists(stock) ? stock : inSave;
         }
 
         public string Param(string key, string fallback = null)
