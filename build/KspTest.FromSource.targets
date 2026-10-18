@@ -1,0 +1,35 @@
+<Project>
+  <!-- KspTest from a checkout of this repository (a git submodule) instead of its NuGet packages. Import it at the end of
+       each test project, after its PropertyGroups:
+
+         <PropertyGroup>
+           <KspTestModules>MechJeb;AtmosphereAutopilot</KspTestModules>   (in-game projects: MechJeb, RP1, AtmosphereAutopilot)
+         </PropertyGroup>
+         <Import Project="../KspTest/build/KspTest.FromSource.targets" />
+
+       An in-game project (net48) gets the harness and the named modules as references, and KSP's and Unity's
+       assemblies from the install in KspDir, as the KspTest, KspTest.MechJeb, ... packages give it. A dotnet test
+       project gets KspTest.Xunit (and through it the runner, with the harness it deploys) and its build steps, as the
+       KspTest.Xunit package gives it. Moving to the packages later replaces this import with those PackageReferences.
+
+       KspTest's projects are built against the consumer's KspDir when it has one, so every build of them agrees on the
+       install whichever project reaches them first. -->
+  <PropertyGroup>
+    <_KspTestSrc>$(MSBuildThisFileDirectory)../src/</_KspTestSrc>
+    <_KspTestInGame Condition="$(TargetFramework.StartsWith('net4'))">true</_KspTestInGame>
+    <_KspTestProps Condition="'$(KspDir)' != ''">KspDir=$(KspDir)</_KspTestProps>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(_KspTestInGame)' == 'true'">
+    <_KspTestModule Include="$(KspTestModules)" />
+    <ProjectReference Include="$(_KspTestSrc)KspTest/KspTest.csproj" Private="false" AdditionalProperties="$(_KspTestProps)" />
+    <ProjectReference Include="@(_KspTestModule->'$(_KspTestSrc)KspTest.%(Identity)/KspTest.%(Identity).csproj')" Private="false"
+                      AdditionalProperties="$(_KspTestProps)" />
+  </ItemGroup>
+  <Import Project="$(_KspTestSrc)KspTest/build/KspTest.targets" Condition="'$(_KspTestInGame)' == 'true'" />
+
+  <ItemGroup Condition="'$(_KspTestInGame)' != 'true'">
+    <ProjectReference Include="$(_KspTestSrc)KspTest.Xunit/KspTest.Xunit.csproj" AdditionalProperties="$(_KspTestProps)" />
+  </ItemGroup>
+  <Import Project="$(_KspTestSrc)KspTest.Xunit/build/KspTest.Xunit.targets" Condition="'$(_KspTestInGame)' != 'true'" />
+</Project>

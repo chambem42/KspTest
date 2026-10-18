@@ -13,9 +13,4 @@
   <ItemGroup>
     <ProjectReference Include="../KspTest.Runner/KspTest.Runner.csproj" />
   </ItemGroup>
-  <!-- the harness the tool deploys, from the runner's build (the package build target does this for package consumers) -->
-  <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.dll;$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.MechJeb.dll;$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.RP1.dll;$(MSBuildThisFileDirectory)../../GameData/KspTest/KspTest.version"
-          Link="ksptest/gamedata/KspTest/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
-  </ItemGroup>
 </Project>

@@ -19,6 +19,15 @@ namespace KspTest
         /// <summary>A label the test sets for the rows that follow (takeoff, SmartASS, AA, gear up, ...).</summary>
         public static string Phase = "";
 
+        /// <summary>
+        /// The aa* columns for a vessel (the vertical given): AtmosphereAutopilot's state in the header's order, from
+        /// KspTest.AtmosphereAutopilot when it is installed; without it the columns are 0 (not active) and empty.
+        /// </summary>
+        public static Func<Vessel, Vector3d, double[]> AutopilotColumns;
+
+        private static readonly double[] NoAutopilot =
+            { 0, double.NaN, double.NaN, double.NaN, double.NaN, double.NaN, double.NaN, double.NaN, double.NaN };
+
         private static FlightTrace _current;
         private string _path;
         private readonly StringBuilder _rows = new StringBuilder();
@@ -82,18 +91,6 @@ namespace KspTest
             _rows.Length = 0;
         }
 
-        private static double Num(object o, Vector3d up)
-        {
-            switch (o)
-            {
-                case null: return double.NaN;
-                case Vector3d d: return Vector3d.Dot(d, up);
-                case Vector3 f: return Vector3d.Dot((Vector3d)f, up);
-                case IConvertible c: return c.ToDouble(CultureInfo.InvariantCulture);
-                default: return double.NaN;
-            }
-        }
-
         private void Sample(Vessel v)
         {
             double ut = Planetarium.GetUniversalTime();
@@ -122,19 +119,12 @@ namespace KspTest
             double qs = qkPa * refArea;
             double cl = qs > 1e-6 ? lift / qs : double.NaN, cd = qs > 1e-6 ? drag / qs : double.NaN;
             double cm = qs > 1e-6 && refArea > 0 ? moment / (qs * Math.Sqrt(refArea)) : double.NaN;
+            double[] aa = AutopilotColumns?.Invoke(v, up) ?? NoAutopilot;
             double[] nums =
             {
                 ut - _t0, double.NaN, v.altitude, v.heightFromTerrain, v.srfSpeed, v.verticalSpeed, pitch, Flight.AoA, gamma, q,
                 v.ctrlState.pitch, v.ctrlState.mainThrottle, lift, drag, v.totalMass * g, moment, FarApi.WingStallMean(v),
-                Aa.Active(v) ? 1 : 0,
-                Num(Aa.Read(v, "DirectorController", "desired_aoa"), up) * Mathf.Rad2Deg,
-                Num(Aa.Read(v, "DirectorController", "desired_pitch_v"), up) * Mathf.Rad2Deg,
-                Num(Aa.Read(v, "DirectorController", "desired_pitch_acc"), up) * Mathf.Rad2Deg,
-                Num(Aa.Read(v, "PitchAoAController", "desired_aoa"), up) * Mathf.Rad2Deg,
-                Num(Aa.Read(v, "PitchAngularVelocityController", "desired_v"), up) * Mathf.Rad2Deg,
-                Num(Aa.Read(v, "PitchAngularAccController", "desired_acc"), up) * Mathf.Rad2Deg,
-                Num(Aa.Read(v, "PitchAngularAccController", "output"), up),
-                Num(Aa.Read(v, "CruiseController", "desired_vert_acc"), up),
+                aa[0], aa[1], aa[2], aa[3], aa[4], aa[5], aa[6], aa[7], aa[8],
                 v.mach, qkPa, refArea, FarStat(v, "VesselLiftCoeff"), FarStat(v, "VesselDragCoeff"), FarStat(v, "VesselStallFrac"),
                 cl, cd, cm,
             };

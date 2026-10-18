@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/KspTest.AtmosphereAutopilot/KspTest.AtmosphereAutopilot.csproj" />
     <Project Path="src/KspTest.MechJeb/KspTest.MechJeb.csproj" />
     <Project Path="src/KspTest.RP1/KspTest.RP1.csproj" />
     <Project Path="src/KspTest.Runner/KspTest.Runner.csproj" />

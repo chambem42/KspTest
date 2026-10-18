@@ -19,13 +19,19 @@
     <ProjectReference Include="../KspTest/KspTest.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
     <ProjectReference Include="../KspTest.MechJeb/KspTest.MechJeb.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
     <ProjectReference Include="../KspTest.RP1/KspTest.RP1.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+    <ProjectReference Include="../KspTest.AtmosphereAutopilot/KspTest.AtmosphereAutopilot.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.dll" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.MechJeb.dll" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.RP1.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.AtmosphereAutopilot.dll" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/KspTest.version" />
     <None Include="@(HarnessFile)" Pack="true" PackagePath="gamedata/KspTest/%(Filename)%(Extension)" Visible="false" />
+    <!-- and beside whatever references this project (the tool, a test project using KspTest from source), where
+         Deployer.BundledHarness looks: package consumers get it from build/KspTest.Runner.targets instead -->
+    <None Include="@(HarnessFile)" Link="ksptest/gamedata/KspTest/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" Pack="false" Visible="false" />
     <None Include="build/KspTest.Runner.targets" Pack="true" PackagePath="build/;buildTransitive/" />
   </ItemGroup>
 </Project>

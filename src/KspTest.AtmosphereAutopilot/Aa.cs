@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Reflection;
 
-namespace KspTest
+namespace KspTest.AtmosphereAutopilot
 {
     /// <summary>
     /// AtmosphereAutopilot's cruise flight, reached by reflection so the harness does not depend on AA: course hold at
