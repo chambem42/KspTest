@@ -12,6 +12,19 @@
     <None Include="$(MSBuildThisFileDirectory)xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
 
+  <!-- An in-game project whose KspRequires files the install in KspDir lacks is not built at all: it compiles against
+       that mod (or KspTest's helpers for it), and its tests skip there anyway ([KspFact(Requires)]). -->
+  <Target Name="KspTestSkipUnavailablePlugins" BeforeTargets="AssignProjectConfiguration" Condition="'$(KspDir)' != ''">
+    <ItemGroup>
+      <_KspTestRequired Include="%(ProjectReference.KspRequires)" Project="%(ProjectReference.Identity)"
+                        Condition="'%(ProjectReference.KspRequires)' != ''" />
+      <_KspTestMissing Include="@(_KspTestRequired)" Condition="!Exists('$(KspDir)/GameData/%(Identity)')" />
+      <ProjectReference Remove="@(_KspTestMissing->'%(Project)')" />
+    </ItemGroup>
+    <Message Importance="high" Condition="'@(_KspTestMissing)' != ''"
+             Text="KspTest: not building %(_KspTestMissing.Project): $(KspDir) has no GameData/%(_KspTestMissing.Identity)" />
+  </Target>
+
   <Target Name="KspTestCopyPlugins" AfterTargets="Build" Condition="'@(KspTestPlugin)' != ''">
     <ItemGroup>
       <_KspTestPluginFile Include="@(KspTestPlugin)" PluginName="%(Filename)" />

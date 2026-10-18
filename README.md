@@ -10,6 +10,7 @@ state and quits; the run returns pass/fail with screenshots and logs. Runs on Wi
 |---|---|
 | `KspTest` | the in-game harness: `TestRunner`, `Nav`, `Wait`, `Ugui`, `Imgui`, `Paw`, `Ctrl`, `Flight`, `Assert`, `Snap` (compile-time reference for in-game test projects) |
 | `KspTest.MechJeb` | `Mj` helpers that drive MechJeb (SmartASS, ascent, landing) for any mod's tests |
+| `KspTest.AtmosphereAutopilot` | `Aa` helpers that fly on AtmosphereAutopilot (cruise, its controllers' state); by reflection, so it loads with or without AA |
 | `KspTest.RP1` | RP-1 integration: launches through KCT simulations, drives the KCT and RP-1 windows |
 | `KspTest.Runner` | runs tests from outside the game: deploys the harness (it carries it) and test assemblies, resets the save, launches and watches KSP, collects results |
 | `KspTest.Xunit` | `dotnet test` support: `[KspFact]` and `Ksp.Run` |
@@ -21,10 +22,10 @@ Packed into `../nuget-local` (a `NuGet.Config` in the parent folder points every
 
 A mod keeps its tests in two projects of its own; the mod itself never references KspTest.
 
-1. **In-game tests** (net48, loaded by KSP): reference `KspTest` (and `KspTest.MechJeb` / `KspTest.RP1` if
-   needed). The `KspTest` package references KSP's and Unity's assemblies from the install in `KspDir` (or the
-   `KSPDIR` environment variable, or `KspData`), none copied to the output; set `KspTestKspReferences` to false to
-   reference them yourself.
+1. **In-game tests** (net48, loaded by KSP): reference `KspTest` (and `KspTest.MechJeb` / `KspTest.RP1` /
+   `KspTest.AtmosphereAutopilot` if needed). The `KspTest` package references KSP's and Unity's assemblies from the
+   install in `KspDir` (or the `KSPDIR` environment variable, or `KspData`), none copied to the output; set
+   `KspTestKspReferences` to false to reference them yourself.
 
    ```csharp
    [UITest("Mj_AscentToOrbit", Requires = "MechJeb", StartsAt = StartState.Flight, Craft = "UITest_Rocket")]
@@ -64,6 +65,23 @@ A mod keeps its tests in two projects of its own; the mod itself never reference
    install configured every `[KspFact]` is skipped.
 
 MechJeb2's `MechJebKspTest` and `MechJebKspTestRun`, and FAR's `KspTests/`, are worked examples.
+
+### From source (a git submodule)
+
+Until the packages are published, a repo can carry KspTest as a submodule and import
+`build/KspTest.FromSource.targets` at the end of each test project instead of the PackageReferences:
+
+```xml
+<PropertyGroup>
+  <KspTestModules>MechJeb;AtmosphereAutopilot</KspTestModules>   <!-- in-game projects: MechJeb, RP1, AtmosphereAutopilot -->
+</PropertyGroup>
+<Import Project="../KspTest/build/KspTest.FromSource.targets" />
+```
+
+It gives an in-game project the harness and the named modules, and a `dotnet test` project `KspTest.Xunit` with the
+runner and the harness it deploys, as the packages would. On an install without MechJeb or RP-1, an in-game project
+that needs one builds empty and a `KspRequires` reference to it is left out, so the tests build on any install and
+those skip. FAR's `KspTests/` uses it (with `KSPTEST_ROOT` pointing at another checkout to work on both at once).
 
 ## ksptest
 

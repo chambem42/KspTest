@@ -8,6 +8,11 @@
     <LangVersion>10</LangVersion>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <_KspTestHasMechJeb>$([System.IO.File]::Exists('$(KspGameData)/MechJeb2/Plugins/MechJeb2.dll'))</_KspTestHasMechJeb>
+    <_KspTestHasRP1>$([System.IO.File]::Exists('$(KspGameData)/RP-1/Plugins/RP0.dll'))</_KspTestHasRP1>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
@@ -17,14 +22,18 @@
        its version was built with -->
   <ItemGroup>
     <ProjectReference Include="../KspTest/KspTest.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
-    <ProjectReference Include="../KspTest.MechJeb/KspTest.MechJeb.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
-    <ProjectReference Include="../KspTest.RP1/KspTest.RP1.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+    <!-- the MechJeb and RP-1 helpers compile against their mod: built and carried only when the install has it (the
+         deployer skips them where the mod is missing anyway) -->
+    <ProjectReference Include="../KspTest.MechJeb/KspTest.MechJeb.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all"
+                      Condition="$(_KspTestHasMechJeb)" />
+    <ProjectReference Include="../KspTest.RP1/KspTest.RP1.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all"
+                      Condition="$(_KspTestHasRP1)" />
     <ProjectReference Include="../KspTest.AtmosphereAutopilot/KspTest.AtmosphereAutopilot.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.dll" />
-    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.MechJeb.dll" />
-    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.RP1.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.MechJeb.dll" Condition="$(_KspTestHasMechJeb)" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.RP1.dll" Condition="$(_KspTestHasRP1)" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.AtmosphereAutopilot.dll" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/KspTest.version" />
     <None Include="@(HarnessFile)" Pack="true" PackagePath="gamedata/KspTest/%(Filename)%(Extension)" Visible="false" />
@@ -34,4 +43,9 @@
           CopyToPublishDirectory="PreserveNewest" Pack="false" Visible="false" />
     <None Include="build/KspTest.Runner.targets" Pack="true" PackagePath="build/;buildTransitive/" />
   </ItemGroup>
+
+  <!-- a published runner carries every module: packing from an install without MechJeb or RP-1 would leave one out -->
+  <Target Name="KspTestCheckPackedModules" BeforeTargets="GenerateNuspec" Condition="!$(_KspTestHasMechJeb) or !$(_KspTestHasRP1)">
+    <Error Text="KspTest.Runner: pack from a KSP install with MechJeb and RP-1 (KspDir), so the package carries every module" />
+  </Target>
 </Project>

@@ -20,8 +20,21 @@
     <_KspTestProps Condition="'$(KspDir)' != ''">KspDir=$(KspDir)</_KspTestProps>
   </PropertyGroup>
 
+  <!-- the MechJeb and RP-1 modules compile against their mod: an in-game project that needs one the install lacks builds
+       empty (and its tests skip there), so a solution builds on any install -->
+  <PropertyGroup Condition="'$(_KspTestInGame)' == 'true' and '$(KspDir)' != ''">
+    <_KspTestMissing Condition="$(KspTestModules.Contains('MechJeb')) and !Exists('$(KspDir)/GameData/MechJeb2/Plugins/MechJeb2.dll')">MechJeb</_KspTestMissing>
+    <_KspTestMissing Condition="'$(_KspTestMissing)' == '' and $(KspTestModules.Contains('RP1')) and !Exists('$(KspDir)/GameData/RP-1/Plugins/RP0.dll')">RP-1</_KspTestMissing>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(_KspTestMissing)' != ''">
+    <Compile Remove="@(Compile)" />
+  </ItemGroup>
+  <Target Name="KspTestReportEmpty" BeforeTargets="CoreCompile" Condition="'$(_KspTestMissing)' != ''">
+    <Message Importance="high" Text="KspTest: $(MSBuildProjectName) builds empty: $(KspDir) has no $(_KspTestMissing)" />
+  </Target>
+
   <ItemGroup Condition="'$(_KspTestInGame)' == 'true'">
-    <_KspTestModule Include="$(KspTestModules)" />
+    <_KspTestModule Include="$(KspTestModules)" Condition="'$(_KspTestMissing)' == ''" />
     <ProjectReference Include="$(_KspTestSrc)KspTest/KspTest.csproj" Private="false" AdditionalProperties="$(_KspTestProps)" />
     <ProjectReference Include="@(_KspTestModule->'$(_KspTestSrc)KspTest.%(Identity)/KspTest.%(Identity).csproj')" Private="false"
                       AdditionalProperties="$(_KspTestProps)" />
