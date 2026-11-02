@@ -32,9 +32,17 @@ namespace KspTest
             try
             {
                 yield return new WaitForEndOfFrame();
-                ScreenCapture.CaptureScreenshot(path);
-                float deadline = Time.realtimeSinceStartup + 10f;
-                while (!File.Exists(path) && Time.realtimeSinceStartup < deadline) yield return null;
+                if (Application.isBatchMode)
+                {
+                    try { RenderCameras(path); }
+                    catch (System.Exception e) { Log.Warn("batchmode screenshot failed: " + e.Message); }
+                }
+                else
+                {
+                    ScreenCapture.CaptureScreenshot(path);
+                    float deadline = Time.realtimeSinceStartup + 10f;
+                    while (!File.Exists(path) && Time.realtimeSinceStartup < deadline) yield return null;
+                }
             }
             finally
             {
@@ -48,6 +56,47 @@ namespace KspTest
             else
             {
                 Log.Warn("screenshot not written: " + path);
+            }
+        }
+
+        /// <summary>
+        /// A screenshot without a screen: -batchmode never draws a frame to the window, so CaptureScreenshot gets nothing
+        /// (or black), but the graphics device is still there. Renders every enabled camera that draws to the screen, in
+        /// depth order as Unity would, into one texture and saves it. KSP's uGUI draws through its UI camera, so it is in
+        /// the shot; IMGUI windows (OnGUI) are not.
+        /// </summary>
+        private static void RenderCameras(string path)
+        {
+            int w = Screen.width, h = Screen.height;
+            var cams = new System.Collections.Generic.List<Camera>();
+            foreach (Camera c in Camera.allCameras)
+                if (c.targetTexture == null)
+                    cams.Add(c);
+            cams.Sort((a, b) => a.depth.CompareTo(b.depth));
+
+            var rt = RenderTexture.GetTemporary(w, h, 24, RenderTextureFormat.ARGB32);
+            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+            RenderTexture prev = RenderTexture.active;
+            try
+            {
+                RenderTexture.active = rt;
+                GL.Clear(true, true, Color.black);
+                foreach (Camera c in cams)
+                {
+                    c.targetTexture = rt;
+                    try { c.Render(); }
+                    finally { c.targetTexture = null; }
+                }
+                RenderTexture.active = rt;
+                tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                tex.Apply(false);
+                File.WriteAllBytes(path, tex.EncodeToPNG());
+            }
+            finally
+            {
+                RenderTexture.active = prev;
+                RenderTexture.ReleaseTemporary(rt);
+                Object.Destroy(tex);
             }
         }
 

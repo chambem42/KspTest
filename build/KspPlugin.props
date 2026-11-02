@@ -28,6 +28,7 @@
     <Reference Include="UnityEngine.UIModule" HintPath="$(KspManaged)/UnityEngine.UIModule.dll" Private="false" />
     <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(KspManaged)/UnityEngine.TextRenderingModule.dll" Private="false" />
     <Reference Include="UnityEngine.ScreenCaptureModule" HintPath="$(KspManaged)/UnityEngine.ScreenCaptureModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(KspManaged)/UnityEngine.ImageConversionModule.dll" Private="false" />
     <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(KspManaged)/UnityEngine.InputLegacyModule.dll" Private="false" />
     <Reference Include="UnityEngine.PhysicsModule" HintPath="$(KspManaged)/UnityEngine.PhysicsModule.dll" Private="false" />
   </ItemGroup>
