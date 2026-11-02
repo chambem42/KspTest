@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -13,6 +15,13 @@ namespace KspTest.Runner
     ///     or while another holds the lock, then holds it until its KSP is gone.  A lock whose pid is no longer running is
     ///     stale and taken over; one written by hand without a pid counts as held for 12 hours.  A script that holds the lock
     ///     over several runs passes it on by setting KSPTEST_LOCK_PID to its pid for the runs it starts.
+    ///
+    ///     Runs allowing more KSPs at once (<see cref="AcquireSlot" />, each from an install of its own: thin clones) take a
+    ///     slot instead, a file beside the lock named for the install ("&lt;lock&gt;.&lt;folder&gt;-&lt;hash&gt;", with a
+    ///     "state=loading|loaded" the run moves on once its KSP has loaded).  A slot is taken when no one-KSP run holds the
+    ///     lock, no run plays in that install, fewer than the maximum are taken, no other slot's KSP is still loading (loads
+    ///     one at a time: a ModuleManager rebuild finished and handed on before the next clone loads) and every KSP running
+    ///     is a slot's.  A one-KSP run waits for every slot as for a lock.
     /// </summary>
     public sealed class KspLock : IDisposable
     {
@@ -21,10 +30,107 @@ namespace KspTest.Runner
         private readonly string _path;
         private readonly int _pid = Process.GetCurrentProcess().Id;
         private bool _held;
+        private string _text = "";
 
         private KspLock(string path)
         {
             _path = path;
+        }
+
+        /// <summary>Waits for a slot for a run in this install, beside the lock at lockPath, up to maxKsps KSPs at once.</summary>
+        public static KspLock AcquireSlot(string lockPath, KspInstall install, int maxKsps, string description, TimeSpan wait, Action<string> log)
+        {
+            string root = install.Root.TrimEnd('\\', '/');
+            var l = new KspLock(SlotPath(lockPath, root));
+            DateTime deadline = DateTime.Now + wait, nextNote = DateTime.Now;
+            while (true)
+            {
+                string? why;
+                using (FileMutex.Acquire(lockPath + ".gate", "another run taking a KSP slot", TimeSpan.FromMinutes(1), log))
+                {
+                    why = SlotBusy(lockPath, root, maxKsps);
+                    if (why == null && l.TryCreate($"install={root} state=loading {description}"))
+                        return l;
+                }
+
+                if (DateTime.Now > deadline)
+                    throw new TimeoutException($"gave up after {wait.TotalSeconds:F0} s waiting for a KSP slot: {why}");
+                if (DateTime.Now >= nextNote)
+                {
+                    log($"waiting for a KSP slot: {why}");
+                    nextNote = DateTime.Now.AddMinutes(5);
+                }
+
+                Thread.Sleep(2000);
+            }
+        }
+
+        /// <summary>A slot's KSP has loaded: the next slot's may start loading.</summary>
+        public void MarkLoaded()
+        {
+            if (!_held || !_text.Contains("state=loading"))
+                return;
+            _text = _text.Replace("state=loading", "state=loaded");
+            try { File.WriteAllText(_path, _text, Encoding.ASCII); }
+            catch (IOException) { /* still loading as far as the others know: they wait for this run instead */ }
+        }
+
+        private static string SlotPath(string lockPath, string root)
+        {
+            uint hash = 2166136261;
+            foreach (char c in root.ToLowerInvariant())
+                hash = (hash ^ c) * 16777619;
+            return $"{lockPath}.{Regex.Replace(Path.GetFileName(root), @"[^A-Za-z0-9_.@-]", "_")}-{hash:x8}";
+        }
+
+        // the live slots' texts (stale ones removed)
+        private static List<string> LiveSlots(string lockPath)
+        {
+            var live = new List<string>();
+            string dir = Path.GetDirectoryName(Path.GetFullPath(lockPath))!, prefix = Path.GetFileName(lockPath) + ".";
+            if (!Directory.Exists(dir))
+                return live;
+            foreach (string f in Directory.GetFiles(dir, prefix + "*").Where(f => !f.EndsWith(".gate")))
+            {
+                string text = SafeRead(f);
+                Match m = Regex.Match(text, @"pid=(\d+)");
+                if (m.Success && IsRunning(int.Parse(m.Groups[1].Value)))
+                    live.Add(text);
+                else if (m.Success)
+                    TryDelete(f);
+            }
+
+            return live;
+        }
+
+        // why a slot for this install cannot be taken now, or null
+        private static string? SlotBusy(string lockPath, string root, int maxKsps)
+        {
+            if (File.Exists(lockPath))
+            {
+                string text = SafeRead(lockPath);
+                Match m = Regex.Match(text, @"pid=(\d+)");
+                if (m.Success ? IsRunning(int.Parse(m.Groups[1].Value)) : DateTime.Now - File.GetLastWriteTime(lockPath) < TimeSpan.FromHours(12))
+                    return $"a one-KSP run holds the lock ({text.Trim()})";
+            }
+
+            List<string> slots = LiveSlots(lockPath);
+            List<string> installs = slots.Select(s => Regex.Match(s, @"install=(.+?) state=").Groups[1].Value).ToList();
+            if (installs.Any(i => i.Equals(root, StringComparison.OrdinalIgnoreCase)))
+                return $"another run plays in {root}";
+            if (slots.Count >= maxKsps)
+                return $"{slots.Count} of {maxKsps} slots taken";
+            if (slots.FirstOrDefault(s => s.Contains("state=loading")) is string loading)
+                return $"a KSP is loading ({loading.Trim()})";
+            foreach (Process p in KspInstall.RunningKsps())
+            {
+                string? exe = KspInstall.PathOf(p);
+                string? dir = exe == null ? null : Path.GetDirectoryName(exe);
+                if (dir == null || !installs.Any(i => i.Equals(dir, StringComparison.OrdinalIgnoreCase)))
+                    return $"a KSP that is no slot's is running ({exe ?? p.Id.ToString()})";
+            }
+
+            return null;
         }
 
         /// <summary>Waits for the lock and takes it (or finds it held by the parent that started this run).</summary>
@@ -54,6 +160,10 @@ namespace KspTest.Runner
                 if (heldByParent && others.Count == 0)
                     return l; // the parent's lock is this run's; the parent removes it
 
+                // a slot taken for a KSP that has not started yet holds the machine as the lock does
+                if (holder == null && LiveSlots(path).FirstOrDefault() is string slot)
+                    holder = slot.Trim();
+
                 if (holder == null && others.Count == 0 && l.TryCreate(description))
                     return l;
 
@@ -66,7 +176,7 @@ namespace KspTest.Runner
                     nextNote = DateTime.Now.AddMinutes(5);
                 }
 
-                Thread.Sleep(15000);
+                Thread.Sleep(2000);   // a check is a file and a process list: cheap, and the next run starts within 2 s of the last
             }
         }
 
@@ -77,7 +187,8 @@ namespace KspTest.Runner
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_path))!);
                 // CreateNew fails if another run created it since the check
                 using var fs = new FileStream(_path, FileMode.CreateNew, FileAccess.Write);
-                byte[] bytes = Encoding.ASCII.GetBytes($"pid={_pid} {description} started={DateTime.Now:s}");
+                _text = $"pid={_pid} {description} started={DateTime.Now:s}";
+                byte[] bytes = Encoding.ASCII.GetBytes(_text);
                 fs.Write(bytes, 0, bytes.Length);
                 _held = true;
                 return true;

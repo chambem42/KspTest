@@ -10,7 +10,7 @@ namespace KspTest.Tests.RP1
     /// <summary>RP-1 / KCT tests. Params: craft, peKm, apKm, altKm, inc, ut, entrySpeed, entryAltKm.</summary>
     public static class Rp1Tests
     {
-        [UITest("Kct_SimOnPad", Requires = "RP-1", StartsAt = StartState.Vab, Craft = "UITest_Sounding")]
+        [UITest(Requires = "RP-1", StartsAt = StartState.Vab, Craft = "UITest_Sounding")]
         public static IEnumerator Kct_SimOnPad(TestContext ctx)
         {
             Ugui.DismissPopups();   // first-run / reminder dialogs
@@ -24,7 +24,7 @@ namespace KspTest.Tests.RP1
             Assert.True(HighLogic.LoadedSceneIsEditor, "back in the editor");
         }
 
-        [UITest("Kct_SimConfig_Circular", Requires = "RP-1", StartsAt = StartState.Vab, Craft = "UITest_Sounding")]
+        [UITest(Requires = "RP-1", StartsAt = StartState.Vab, Craft = "UITest_Sounding")]
         public static IEnumerator Kct_SimConfig_Circular(TestContext ctx)
         {
             double altKm = ctx.ParamDouble("altKm", 300);
@@ -59,7 +59,7 @@ namespace KspTest.Tests.RP1
             Assert.False(Rp1.IsSimulatedFlight, "IsSimulatedFlight cleared");
         }
 
-        [UITest("Kct_SimConfig_Reentry", Requires = "RP-1", StartsAt = StartState.Vab, Craft = "UITest_Capsule", TimeoutSec = 900)]
+        [UITest(Requires = "RP-1", StartsAt = StartState.Vab, Craft = "UITest_Capsule", TimeoutSec = 900)]
         public static IEnumerator Kct_SimConfig_Reentry(TestContext ctx)
         {
             double peKm = ctx.ParamDouble("peKm", 40);
@@ -101,7 +101,7 @@ namespace KspTest.Tests.RP1
         }
 
         // Defaults are a user-reported CTD: Earth->Mars from a KAC alarm, Inc/LAN/Time to Pe blank.
-        [UITest("Kct_SimConfig_Hyperbolic", Requires = "RP-1", StartsAt = StartState.Vab, Craft = "UITest_Capsule", TimeoutSec = 900)]
+        [UITest(Requires = "RP-1", StartsAt = StartState.Vab, Craft = "UITest_Capsule", TimeoutSec = 900)]
         public static IEnumerator Kct_SimConfig_Hyperbolic(TestContext ctx)
         {
             string target = ctx.Param("target", "Mars");
@@ -133,7 +133,7 @@ namespace KspTest.Tests.RP1
             yield return Snap.Shot(ctx, "hyperbolic-coast");
         }
 
-        [UITest("Rp1_TopWindowTabs", Requires = "RP-1", StartsAt = StartState.SpaceCenter)]
+        [UITest(Requires = "RP-1", StartsAt = StartState.SpaceCenter)]
         public static IEnumerator Rp1_TopWindowTabs(TestContext ctx)
         {
             Ugui.DismissPopups();
@@ -142,7 +142,7 @@ namespace KspTest.Tests.RP1
             yield return Rp1.ShowTopWindow();
             yield return Snap.Shot(ctx, "top-window");
 
-            foreach (var tab in (ctx.Param("tabs") ?? "Budget,Tooling,Astronauts,Training,Career Log").Split(','))
+            foreach (var tab in ctx.Param("tabs", "Budget,Tooling,Astronauts,Training,Career Log").Split(','))
             {
                 ctx.Step("Tab " + tab);
                 yield return Rp1.ClickTopWindowTab(tab.Trim());
@@ -150,6 +150,53 @@ namespace KspTest.Tests.RP1
                 yield return Snap.Shot(ctx, "tab-" + tab.Trim());
             }
             Log.Info(Imgui.Dump());
+        }
+
+        /// <summary>
+        /// Sets up the same KCT reentry simulation as the SSTO tests and hands it over: gear up, throttle zero, and
+        /// nothing else - no SmartASS, no Trajectories hold or steering, no warp, no cheats. For flying by hand (run
+        /// with -Keep). Params: mode (reentry / circular), craft, peKm, apKm, startAltKm, orbitAltKm (circular,
+        /// default 150), simUT, incDeg, propellant.
+        /// </summary>
+        [UITest(Requires = "RP-1", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big", TimeoutSec = 900)]
+        public static IEnumerator Rp1_ReentrySim_Manual(TestContext ctx)
+        {
+            Ugui.DismissPopups();
+            string craft = ctx.Param("craft", "Mk2 SSTO Big");
+            ctx.Step($"Open {craft} in the VAB");
+            yield return Nav.EnsureState(ctx, StartState.Vab, ctx.CraftPath(craft));
+            Ugui.DismissPopups();
+            double propellant = ctx.ParamDouble("propellant", 0);
+            ctx.Record("propellantDirect", Rp1.ApplyPropellantLoadDirect(propellant));
+
+            // mode=reentry (default): the SSTO tests' entry. mode=circular: a circular orbit at orbitAltKm, to be
+            // moved by hand (HyperEdit) onto an approach.
+            bool circular = ctx.Param("mode", "reentry").Equals("circular", StringComparison.OrdinalIgnoreCase);
+            double? simUT = ctx.ParamDouble("simUT", 2019800000) > 0 ? ctx.ParamDouble("simUT", 2019800000) : (double?)null;
+            ctx.Step(circular ? "Start a circular orbit simulation" : "Start the reentry simulation");
+            if (circular)
+            {
+                var spec = SimSpec.Circular(ctx.ParamDouble("orbitAltKm", 150), ctx.ParamDouble("incDeg", 0));
+                spec.UT = simUT;
+                yield return Rp1.ConfigureSim(spec);
+            }
+            else
+                yield return Rp1.ConfigureSim(new SimSpec
+                {
+                    StartInOrbit = true, Mode = "Reentry",
+                    PeKm = ctx.ParamDouble("peKm", 70), Arrival = "Apoapsis", ApKm = ctx.ParamDouble("apKm", 150),
+                    EntryAltKm = ctx.ParamDouble("startAltKm", 140),
+                    IncDeg = ctx.ParamDouble("incDeg", 0), LanDeg = 0, ArgPeDeg = 0,
+                    UT = simUT,
+                    Attitude = "Prograde", LogTelemetry = false, PropellantPct = propellant,
+                });
+            yield return Rp1.StartSim();
+            Assert.Equal(circular ? "Circular" : "Reentry", Rp1.SimMode, "SimOrbitMode");
+            var v = FlightGlobals.ActiveVessel;
+            ctx.Record("spawnAltKm", Math.Round(v.altitude / 1000, 1));
+            ctx.Record("massT", Math.Round(v.GetTotalMass(), 3));
+            ctx.Record("gearUp", Ctrl.RetractGear());
+            Ctrl.SetThrottle(0f);
         }
     }
 }

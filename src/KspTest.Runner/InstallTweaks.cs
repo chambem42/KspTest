@@ -10,7 +10,7 @@ namespace KspTest.Runner
 {
     /// <summary>
     ///     What a run changes in the install, and puts back afterwards: QuickStart off (it would race the harness), the master
-    ///     volume (with Mute), and Unity's window prefs.
+    ///     volume (with Mute), and Unity's window prefs.  Mods' first-run questions are answered for good.
     /// </summary>
     public sealed class InstallTweaks
     {
@@ -37,6 +37,36 @@ namespace KspTest.Runner
                 disabled = "Enabled = False\r\n" + _quickStartWas;
             File.WriteAllText(QuickStartCfg, disabled);
             _log("QuickStart disabled for this run");
+        }
+
+        /// <summary>
+        ///     Mods that ask the player something once, in a window that holds up the game or the tests, answered where
+        ///     nobody has answered yet (an instance's first run); kept, as the player's own answer would be:
+        ///     KSPCommunityFixes' PNG texture cache, on (it stops the load; the cache speeds up every later load);
+        ///     ClickThroughBlocker's focus mode in new games, its defaults (focus follows the mouse, no universal blocking);
+        ///     Toolbar Controller's intro window, not shown at startup.
+        /// </summary>
+        public void AnswerFirstRunQuestions()
+        {
+            Answer("KSPCommunityFixes", "PluginData/PNGTextureCache.cfg", "userOptInChoiceDone = True\r\ntextureCacheEnabled = True\r\n",
+                "KSPCommunityFixes' texture cache: on");
+            // with global defaults ClickThroughBlocker sets every new game from them and shows no popup
+            Answer("000_ClickThroughBlocker", "Global.cfg", "focusFollowsClick = False\r\nuniversalClickBlocking = False\r\n",
+                "ClickThroughBlocker's focus mode: its defaults for new games");
+            Answer("001_ToolbarControl", "PluginData/ToolbarControl.cfg", "ToolbarControlData\r\n{\r\n\tshowWindowAtStartup = False\r\n}\r\n",
+                "Toolbar Controller's intro window: off");
+            Answer("RP-1", "Plugins/PluginData/RP1MentionLoadingImages", "", "RP-1's loading images popup: don't show again");
+        }
+
+        private void Answer(string mod, string file, string answer, string what)
+        {
+            string dir = Path.Combine(_install.GameData, mod);
+            string path = Path.Combine(dir, file);
+            if (!Directory.Exists(dir) || File.Exists(path))
+                return;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, answer);
+            _log($"first-run question answered: {what}");
         }
 
         public void RestoreQuickStart()

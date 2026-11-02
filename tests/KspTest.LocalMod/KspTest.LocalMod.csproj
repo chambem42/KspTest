@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- A mod that is on no mod index, for SetupTests.Mods_Local: built into GameData/KspTestLocalMod here, the folder the
+       test names, which KspTest copies into the test's instance. -->
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <AssemblyName>KspTestLocalMod</AssemblyName>
+    <RootNamespace>KspTestLocalMod</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <OutputPath>GameData/KspTestLocalMod/Plugins/</OutputPath>
+  </PropertyGroup>
+</Project>

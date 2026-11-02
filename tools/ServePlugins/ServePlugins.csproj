@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Serve requests in progress (settled ones move into the harness or its modules), loaded into a
+       running Serve session without a restart: ksptest serve-plugin tools/ServePlugins/ServePlugins.csproj builds this
+       under a fresh AssemblyName (Mono can't load two assemblies of one name, nor unload one) and hands the DLL to
+       /plugin. Never deployed into GameData: the session loads it from its bytes. -->
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <RootNamespace>KspTest.ServePlugins</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <Deterministic>false</Deterministic>
+  </PropertyGroup>
+  <!-- ksptest serve-plugin's fresh name for each build, and a folder of its own -->
+  <PropertyGroup Condition="'$(ServePluginName)' != ''">
+    <AssemblyName>$(ServePluginName)</AssemblyName>
+    <OutputPath>bin/serve-plugins/$(ServePluginName)/</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="UnityEngine.AudioModule" HintPath="$(KspManaged)/UnityEngine.AudioModule.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/KspTest/KspTest.csproj" Private="false" />
+    <ProjectReference Include="../../src/KspTest.Far/KspTest.Far.csproj" Private="false" />
+    <ProjectReference Include="../../src/KspTest.AtmosphereAutopilot/KspTest.AtmosphereAutopilot.csproj" Private="false" />
+  </ItemGroup>
+</Project>

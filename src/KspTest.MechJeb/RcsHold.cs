@@ -35,7 +35,7 @@ namespace KspTest.MechJeb
 
             // hold=sas: stock SAS instead (sasMode, default Prograde; StabilityAssist if the vessel cannot do it), MechJeb
             // released. Its error is measured against orbital prograde (errProg columns) whatever the mode.
-            bool sas = (ctx.Param("hold", "mechjeb") ?? "mechjeb").Equals("sas", StringComparison.OrdinalIgnoreCase);
+            bool sas = ctx.Param("hold", "mechjeb").Equals("sas", StringComparison.OrdinalIgnoreCase);
             string target;
             if (sas)
             {
@@ -68,7 +68,7 @@ namespace KspTest.MechJeb
             foreach (var a in AssemblyLoader.loadedAssemblies)
                 timing = timing ?? a.assembly.GetType("RcsInputPerStep.RcsTiming", false);
             ctx.Record("rcsTimingPresent", timing != null);
-            bool profileLog = (ctx.Param("profileLog", "off") ?? "off").Equals("on", StringComparison.OrdinalIgnoreCase) && UnityEngine.Profiling.Profiler.supported;
+            bool profileLog = ctx.ParamBool("profileLog", false) && UnityEngine.Profiling.Profiler.supported;
             ctx.Record("profilerSupported", UnityEngine.Profiling.Profiler.supported);
             ctx.Record("profileLog", profileLog);
             Directory.CreateDirectory(ctx.ResultsDir);

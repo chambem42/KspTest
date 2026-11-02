@@ -7,6 +7,14 @@
        that have them: an assembly built against a mod's helpers must not load without that mod.
        Crafts the tests fly, <KspTestCraft Include="crafts/*.craft" />, are copied to ksp-crafts/, and Ksp.Run puts them
        into every run's save. -->
+  <!-- [KspFact]s that run alike share a KSP session (KspTest.Xunit.KspTestFramework); KspTestBatching=false: one KSP each -->
+  <ItemGroup Condition="'$(KspTestBatching)' != 'false'">
+    <AssemblyAttribute Include="Xunit.TestFrameworkAttribute">
+      <_Parameter1>KspTest.Xunit.KspTestFramework</_Parameter1>
+      <_Parameter2>KspTest.Xunit</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
   <!-- one KSP at a time: test classes run one after another (a project's own xunit.runner.json wins) -->
   <ItemGroup Condition="!Exists('$(MSBuildProjectDirectory)/xunit.runner.json')">
     <None Include="$(MSBuildThisFileDirectory)xunit.runner.json" Link="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" Visible="false" />
@@ -25,6 +33,17 @@
              Text="KspTest: not building %(_KspTestMissing.Project): $(KspDir) has no GameData/%(_KspTestMissing.Identity)" />
   </Target>
 
+  <!-- every [UITest] in the in-game assemblies becomes a [KspFact] (KspTest.Xunit's source generator reads them) -->
+  <ItemGroup>
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="KspTestPlugin" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="KspTestProject" />
+  </ItemGroup>
+  <Target Name="KspTestPluginsToCompiler" AfterTargets="ResolveProjectReferences" Condition="'@(KspTestPlugin)' != ''">
+    <ItemGroup>
+      <AdditionalFiles Include="@(KspTestPlugin)" KspTestPlugin="true" KspTestProject="%(KspTestPlugin.MSBuildSourceProjectFile)" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="KspTestCopyPlugins" AfterTargets="Build" Condition="'@(KspTestPlugin)' != ''">
     <ItemGroup>
       <_KspTestPluginFile Include="@(KspTestPlugin)" PluginName="%(Filename)" />
@@ -37,7 +56,35 @@
                       Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>
 
+  <!-- With no install configured the tests run in a KSP instance KspTest makes (from the user's KSP install, with CKAN):
+         <KspMod Include="FerramAerospaceResearchContinued;KSPBurst" />     CKAN identifiers ("Id" or "Id=version")
+         <KspMod Include="../StandInEngines/GameData/StandInEngines" />    a local mod: its GameData/ModName folder
+         <KspOverlay Include="../GameData/FerramAerospaceResearch" />       the same, for a mod built from source over CKAN's copy
+       the CKAN identifiers written to ksptest-mods.txt and the local mods (full paths) to ksptest-overlays.txt beside the
+       tests (always, so removing one takes effect) -->
+  <Target Name="KspTestWriteInstanceItems" AfterTargets="Build">
+    <ItemGroup>
+      <_KspCkanMod Include="@(KspMod)"
+                   Condition="!$([System.String]::Copy('%(KspMod.Identity)').Contains('/')) And !$([System.String]::Copy('%(KspMod.Identity)').Contains('\'))" />
+      <_KspLocalMod Include="@(KspMod->'%(FullPath)')"
+                    Condition="$([System.String]::Copy('%(KspMod.Identity)').Contains('/')) Or $([System.String]::Copy('%(KspMod.Identity)').Contains('\'))" />
+      <_KspLocalMod Include="@(KspOverlay->'%(FullPath)')" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(OutDir)ksptest-mods.txt" Lines="@(_KspCkanMod)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(OutDir)ksptest-overlays.txt" Lines="@(_KspLocalMod)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
   <Target Name="KspTestCopyCrafts" AfterTargets="Build" Condition="'@(KspTestCraft)' != ''">
     <Copy SourceFiles="@(KspTestCraft)" DestinationFolder="$(OutDir)ksp-crafts/" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Save templates the tests start from, [UITest(Save = "name")], checked in with them:
+         <KspTestSave Include="saves/rp1-career" />    a save folder (persistent.sfs, Ships/, ...), copied to ksp-saves/<name>/ -->
+  <Target Name="KspTestCopySaves" AfterTargets="Build" Condition="'@(KspTestSave)' != ''">
+    <ItemGroup>
+      <_KspTestSaveFile Include="%(KspTestSave.FullPath)/**/*" SaveName="%(KspTestSave.Filename)%(KspTestSave.Extension)" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_KspTestSaveFile)" DestinationFiles="@(_KspTestSaveFile->'$(OutDir)ksp-saves/%(SaveName)/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
   </Target>
 </Project>

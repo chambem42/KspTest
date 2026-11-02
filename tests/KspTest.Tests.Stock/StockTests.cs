@@ -1,21 +1,22 @@
 using System;
 using System.Collections;
+using System.Linq;
 using KspTest;
 using UnityEngine;
 
 namespace KspTest.Tests.Stock
 {
     /// <summary>
-    /// Tests that need only stock KSP. Each declares where it starts (StartsAt + Craft); the runner
-    /// gets the game there from wherever the previous test ended, so several can run per session.
+    /// Tests that need only stock KSP. Each declares where it starts (StartsAt + Craft, its folder - VAB or SPH -
+    /// found); the runner gets the game there from wherever the previous test ended, so several can run per session.
     /// PARAMS in run.cfg override craft / craftDir / launchSite and the per-test numbers.
     /// </summary>
     public static class StockTests
     {
-        [UITest("Smoke_MainMenuToVab", StartsAt = StartState.MainMenu)]
+        [UITest(Kind = "Check", StartsAt = StartState.MainMenu)]
         public static IEnumerator Smoke_MainMenuToVab(TestContext ctx)
         {
-            string craft = ctx.CraftPath(ctx.Param("craft", "UITest_Plane"), ctx.Param("craftDir", "SPH"));
+            string craft = ctx.CraftPath(ctx.Param("craft", "UITest_Plane"), ctx.Param("craftDir"));
 
             ctx.Step("Load save");
             yield return Nav.LoadSave(ctx);
@@ -28,7 +29,7 @@ namespace KspTest.Tests.Stock
             yield return Snap.Shot(ctx, "vab");
         }
 
-        [UITest("Launch_StockButton", StartsAt = StartState.Vab, Craft = "UITest_Plane", CraftDir = "SPH")]
+        [UITest(Kind = "Check", StartsAt = StartState.Vab, Craft = "UITest_Plane")]
         public static IEnumerator Launch_StockButton(TestContext ctx)
         {
             ctx.Step("Launch");
@@ -45,9 +46,10 @@ namespace KspTest.Tests.Stock
         /// <summary>
         /// Opens a PAW in the editor and flips its first toggle field; then in flight activates the first
         /// engine through its PAW button and checks the module state.
-        /// Params: pawPart (part name/title to use in the editor; default root), pawToggle (field name; default first toggle).
+        /// Params: pawPart (part name/title to use in the editor; default root), pawToggle (field name; default first toggle),
+        /// pawDelaySec (wall-clock seconds between reaching flight and opening the engine's PAW; default 2).
         /// </summary>
-        [UITest("Paw_EditorAndFlight", StartsAt = StartState.Vab, Craft = "UITest_Plane", CraftDir = "SPH")]
+        [UITest(Kind = "Check", StartsAt = StartState.Vab, Craft = "UITest_Plane")]
         public static IEnumerator Paw_EditorAndFlight(TestContext ctx)
         {
             ctx.Step("Open PAW in editor");
@@ -57,12 +59,8 @@ namespace KspTest.Tests.Stock
             yield return Snap.Shot(ctx, "paw-editor");
 
             ctx.Step("Flip a toggle");
-            string toggleName = ctx.Param("pawToggle");
-            if (toggleName == null)
-            {
-                foreach (var item in Paw.Window(part).ListItems)
-                    if (item is UIPartActionToggle t && t.Field != null) { toggleName = t.Field.name; break; }
-            }
+            string toggleName = ctx.Param("pawToggle")
+                                ?? Paw.Window(part).ListItems.OfType<UIPartActionToggle>().FirstOrDefault(t => t.Field != null)?.Field.name;
             if (toggleName == null)
             {
                 Log.Warn("no toggle field on " + part.partInfo.title + "; skipping the toggle step");
@@ -79,17 +77,13 @@ namespace KspTest.Tests.Stock
 
             ctx.Step("Launch");
             yield return Nav.Launch(ctx);
+            // a PAW opened the moment the flight scene is ready once came up without the engine's Activate button
+            yield return Wait.Seconds(ctx.ParamDouble("pawDelaySec", 2));
 
             ctx.Step("Activate an engine via its PAW");
-            Part enginePart = null;
-            ModuleEngines engine = null;
-            foreach (var p in FlightGlobals.ActiveVessel.parts)
-            {
-                foreach (PartModule m in p.Modules)
-                    if (m is ModuleEngines me) { enginePart = p; engine = me; break; }
-                if (engine != null) break;
-            }
+            var engine = FlightGlobals.ActiveVessel.FindPartModuleImplementing<ModuleEngines>();
             Assert.NotNull(engine, "an engine part on the vessel");
+            Part enginePart = engine.part;
             yield return Paw.ClickEvent(enginePart, "Activate");
             yield return Wait.Until(() => engine.EngineIgnited, 10, "engine ignited (EngineIgnited flag)");
             ctx.Record("engine", enginePart.partInfo.title);
@@ -99,18 +93,21 @@ namespace KspTest.Tests.Stock
         }
 
         /// <summary>
-        /// Takes an aircraft off the runway under manual control and does a barrel roll with the stick.
-        /// Params: rotateSpeed (m/s), climbPitch (0..1), climbAlt (m), rollInput (-1..1), rollSeconds, minRollDeg.
+        /// Takes an aircraft off the runway under manual control and does a barrel roll with the stick, on TimeControl's
+        /// hyper-warp (the same physics step, more of them per rendered frame; at 1x without TimeControl).
+        /// Params: rotateSpeed (m/s), climbPitch (0..1), climbAlt (m), rollInput (-1..1), rollSeconds, minRollDeg,
+        /// hyper (rate; default 4, 1 = off), hyperAccuracy (physics step multiplier; default 1).
         /// </summary>
-        [UITest("Ctrl_BarrelRoll", StartsAt = StartState.Flight, Craft = "UITest_Plane", CraftDir = "SPH", LaunchSite = "Runway", TimeoutSec = 600)]
+        [UITest(Kind = "Check", StartsAt = StartState.Flight, Craft = "UITest_Plane", LaunchSite = "Runway", TimeoutSec = 600)]
         public static IEnumerator Ctrl_BarrelRoll(TestContext ctx)
         {
-            float rotateSpeed = (float)ctx.ParamDouble("rotateSpeed", 70);
-            float climbPitch = (float)ctx.ParamDouble("climbPitch", 0.4);
+            float rotateSpeed = ctx.ParamFloat("rotateSpeed", 70);
+            float climbPitch = ctx.ParamFloat("climbPitch", 0.4f);
             double climbAlt = ctx.ParamDouble("climbAlt", 800);
-            float rollInput = (float)ctx.ParamDouble("rollInput", 1.0);
+            float rollInput = ctx.ParamFloat("rollInput", 1);
             double rollSeconds = ctx.ParamDouble("rollSeconds", 4);
             double minRoll = ctx.ParamDouble("minRollDeg", 300);
+            double hyper = ctx.ParamDouble("hyper", 4);
             double startAlt = Flight.Altitude;
 
             ctx.Step("Takeoff");
@@ -119,6 +116,10 @@ namespace KspTest.Tests.Stock
             Ctrl.Brakes(false);
             Ctrl.SetThrottle(1f);
             Ctrl.Stage();
+            // every wait below is in game time, so the flight is the same at any rate
+            if (hyper > 1 && !Flight.HyperWarp(hyper, ctx.ParamDouble("hyperAccuracy", 1)))
+                Log.Warn("hyper-warp refused (TimeControl missing?), flying at 1x");
+            ctx.Record("hyper", hyper);
             yield return Wait.Until(() => { Flight.AssertAlive(); return Flight.SurfaceSpeed > rotateSpeed; }, 120, $"surface speed > {rotateSpeed} m/s");
             Ctrl.Set(pitch: climbPitch);
             yield return Wait.Until(() => { Flight.AssertAlive(); return Flight.Altitude - startAlt > climbAlt; }, 180, $"climbed {climbAlt} m");
@@ -140,11 +141,11 @@ namespace KspTest.Tests.Stock
             ctx.Record("altAfterRoll", Flight.Altitude);
             yield return Snap.Shot(ctx, "after-roll");
             Assert.True(System.Math.Abs(rolled) >= minRoll, $"rolled {rolled:F0} deg, expected at least {minRoll}");
-            Ctrl.Detach();
+            // the runner detaches the controls and stops the warps after every test
         }
 
         /// <summary>Driver self-test: spawns stock PopupDialogs and dismisses them by button text.</summary>
-        [UITest("Popup_Dismiss", StartsAt = StartState.SpaceCenter)]
+        [UITest(Kind = "Check", StartsAt = StartState.SpaceCenter)]
         public static IEnumerator Popup_Dismiss(TestContext ctx)
         {
             ctx.Step("Single-button popup");

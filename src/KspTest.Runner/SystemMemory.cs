@@ -40,25 +40,37 @@ namespace KspTest.Runner
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp", "Squad", "Kerbal Space Program", "Crashes");
 
         /// <summary>
-        ///     The crash report Unity wrote since <paramref name="since" />, copied into <paramref name="resultsDir" />
-        ///     (crash-error.log), summarized: what faulted, and whether the system was out of commit.  Null when there is none.
+        ///     The crash report Unity wrote since <paramref name="since" /> for the KSP in <paramref name="installRoot" />,
+        ///     copied into <paramref name="resultsDir" /> (crash-error.log), summarized: what faulted, and whether the system
+        ///     was out of commit.  Null when there is none.  Every KSP on the machine writes its reports into the same folder,
+        ///     so one whose error.log names another install's executable is not this run's.
         /// </summary>
-        public static string? CollectCrash(DateTime since, string resultsDir)
+        public static string? CollectCrash(DateTime since, string resultsDir, string installRoot)
         {
             if (!Directory.Exists(CrashRoot))
                 return null;
-            DirectoryInfo? dir = new DirectoryInfo(CrashRoot).GetDirectories("Crash_*")
-                .Where(d => d.CreationTime >= since.AddSeconds(-5))
-                .OrderByDescending(d => d.CreationTime).FirstOrDefault();
-            if (dir == null)
-                return null;
+            string root = Path.GetFullPath(installRoot).TrimEnd('/', '\\');
+            foreach (DirectoryInfo dir in new DirectoryInfo(CrashRoot).GetDirectories("Crash_*")
+                         .Where(d => d.CreationTime >= since.AddSeconds(-5)).OrderByDescending(d => d.CreationTime))
+            {
+                string error = Path.Combine(dir.FullName, "error.log");
+                if (!File.Exists(error))
+                    return $"KSP crashed (report {dir.FullName}, no error.log)";
+                string text;
+                try { text = File.ReadAllText(error); }
+                catch (IOException) { return $"KSP crashed (report {dir.FullName})"; }
+                // "D:\Games\KSP\KSP_x64.exe, run by Matt."
+                Match exe = Regex.Match(text, @"(?m)^(.+?)[\\/][^\\/]+\.exe, run by");
+                if (exe.Success && !string.Equals(Path.GetFullPath(exe.Groups[1].Value.Trim()).TrimEnd('/', '\\'), root, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                return Summarize(dir, error, text, resultsDir);
+            }
 
-            string error = Path.Combine(dir.FullName, "error.log");
-            if (!File.Exists(error))
-                return $"KSP crashed (report {dir.FullName}, no error.log)";
-            string text;
-            try { text = File.ReadAllText(error); }
-            catch (IOException) { return $"KSP crashed (report {dir.FullName})"; }
+            return null;
+        }
+
+        private static string Summarize(DirectoryInfo dir, string error, string text, string resultsDir)
+        {
             try { File.Copy(error, Path.Combine(resultsDir, "crash-error.log"), true); }
             catch (IOException) { }
 

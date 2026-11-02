@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/KspTest/KspTest.csproj" Private="false" />
+    <ProjectReference Include="../../src/KspTest.Trajectories/KspTest.Trajectories.csproj" Private="false" />
     <ProjectReference Include="../../src/KspTest.MechJeb/KspTest.MechJeb.csproj" Private="false" />
     <ProjectReference Include="../../src/KspTest.RP1/KspTest.RP1.csproj" Private="false" />
     <Reference Include="RP0" HintPath="$(KspGameData)/RP-1/Plugins/RP0.dll" Private="false" />

@@ -1,16 +1,29 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/KspTest.AtmosphereAutopilot/KspTest.AtmosphereAutopilot.csproj" />
+    <Project Path="src/KspTest.Far/KspTest.Far.csproj" />
     <Project Path="src/KspTest.MechJeb/KspTest.MechJeb.csproj" />
     <Project Path="src/KspTest.RP1/KspTest.RP1.csproj" />
+    <Project Path="src/KspTest.ROLib/KspTest.ROLib.csproj" />
     <Project Path="src/KspTest.Runner/KspTest.Runner.csproj" />
     <Project Path="src/KspTest.Tool/KspTest.Tool.csproj" />
+    <Project Path="src/KspTest.Trajectories/KspTest.Trajectories.csproj" />
+    <Project Path="src/KspTest.Trajectories.MechJeb/KspTest.Trajectories.MechJeb.csproj" />
+    <Project Path="src/KspTest.Trajectories.RP1/KspTest.Trajectories.RP1.csproj" />
+    <Project Path="src/KspTest.WaypointManager/KspTest.WaypointManager.csproj" />
+    <Project Path="src/KspTest.WaypointManager.RP1/KspTest.WaypointManager.RP1.csproj" />
     <Project Path="src/KspTest.Xunit/KspTest.Xunit.csproj" />
+    <Project Path="src/KspTest.Xunit.Generator/KspTest.Xunit.Generator.csproj" />
     <Project Path="src/KspTest/KspTest.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/KspTest.LocalMod/KspTest.LocalMod.csproj" />
     <Project Path="tests/KspTest.Tests.MechJeb/KspTest.Tests.MechJeb.csproj" />
     <Project Path="tests/KspTest.Tests.RP1/KspTest.Tests.RP1.csproj" />
+    <Project Path="tests/KspTest.Tests.Run/KspTest.Tests.Run.csproj" />
     <Project Path="tests/KspTest.Tests.Stock/KspTest.Tests.Stock.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ServePlugins/ServePlugins.csproj" />
   </Folder>
 </Solution>

@@ -14,7 +14,7 @@ namespace KspTest.Tests.MechJeb
         /// RCS's 0.05 deadband, so RCS never fires; off, RCS is the only attitude control, as on a vessel whose wheels
         /// can't keep up (RO's).
         /// </summary>
-        [UITest("Rcs_Stock_OrbitHold", Requires = "MechJeb", StartsAt = StartState.Flight, Craft = "Aeris 4A", CraftDir = "SPH", LaunchSite = "Runway", TimeoutSec = 7200)]
+        [UITest(Requires = "MechJeb", StartsAt = StartState.Flight, Craft = "Aeris 4A", CraftDir = "SPH", LaunchSite = "Runway", TimeoutSec = 7200)]
         public static IEnumerator Rcs_Stock_OrbitHold(TestContext ctx)
         {
             double altKm = ctx.ParamDouble("altKm", 100), inc = ctx.ParamDouble("inc", 0);
@@ -33,7 +33,7 @@ namespace KspTest.Tests.MechJeb
             ctx.Record("gearUp", Ctrl.RetractGear());
             ctx.Record("rcsThrusters", Ctrl.EnableRcs());
             int wheelsOff = 0;
-            if ((ctx.Param("wheels", "off") ?? "off").Equals("off", System.StringComparison.OrdinalIgnoreCase))
+            if (ctx.Param("wheels", "off").Equals("off", System.StringComparison.OrdinalIgnoreCase))
                 foreach (Part p in v.parts)
                     foreach (ModuleReactionWheel w in p.FindModulesImplementing<ModuleReactionWheel>())
                     {

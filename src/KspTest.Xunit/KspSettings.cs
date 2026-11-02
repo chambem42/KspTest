@@ -3,33 +3,56 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using KspTest.Runner;
 
 namespace KspTest.Xunit
 {
     /// <summary>
     ///     Where and how the in-game tests run, from ksptest.json beside the test assembly and the environment (which wins):
     ///     <code>
-    ///     { "install": "C:/Games/KSP", "saves": "saves", "results": "results", "lockFile": "...", "mute": true,
+    ///     { "install": "C:/Games/KSP", "results": "results", "lockFile": "...", "mute": true,
     ///       "saveBackups": "...", "loadStallSec": 600, "timeoutSec": 3600,
-    ///       "crafts": ["C:/my crafts"], "params": "crafts=My Plane+My Other Plane" }
+    ///       "crafts": ["C:/my crafts"], "params": "crafts=My Plane+My Other Plane", "mods": ["Kopernicus"] }
     ///     </code>
-    ///     KSPDIR, KSPTEST_SAVES, KSPTEST_RESULTS, KSPTEST_LOCK_FILE, KSPTEST_MUTE, KSPTEST_CRAFTS (paths, ";" separated),
-    ///     KSPTEST_PARAMS.  Relative paths are from the test assembly.  crafts go into every run's save beside the test
-    ///     project's own (ksp-crafts/), and params override the tests' own: to fly the tests on your own vehicles.
+    ///     KSPDIR, KSPTEST_RESULTS, KSPTEST_LOCK_FILE, KSPTEST_MUTE, KSPTEST_CRAFTS (paths, ";" separated),
+    ///     KSPTEST_PARAMS, KSPTEST_MODS.  Relative paths are from the test assembly.  crafts go into every run's save beside
+    ///     the test project's own (ksp-crafts/), and params override the tests' own: to fly the tests on your own vehicles.
+    ///     With no install, the tests run in a KSP instance KspTest makes (<see cref="InstanceManager" />) with the
+    ///     project's KspMod items (ksptest-mods.txt) and the settings' mods, plus the test's own ([KspFact(Mods)]): CKAN
+    ///     identifiers, and local mods (paths; the project's in ksptest-overlays.txt) copied in for each run.  Save templates are the
+    ///     project's own (KspTestSave items, copied to ksp-saves/), never a player's.
     /// </summary>
     public sealed class KspSettings
     {
         public string? Install;
-        public string Saves = "saves";
+        /// <summary>The save templates the test project ships (KspTestSave items): ksp-saves/ beside the tests.</summary>
+        public string Saves = "ksp-saves";
         public string Results = "results";
         public string? SaveBackups;
         public string? LockFile;
         public bool Mute = true;
         public int LoadStallSec = 120;
+        /// <summary>A test's timeout when its [UITest] sets none.</summary>
         public int TimeoutSec = 900;
+
+        /// <summary>More arguments for KSP ("kspArgs", KSPTEST_KSP_ARGS), such as "-batchmode".</summary>
+        public string? KspArgs;
+
+        /// <summary>Low-res textures outside screenshots ("textures", KSPTEST_TEXTURES): full, low or 0-3.</summary>
+        public string? Textures;
 
         /// <summary>Crafts (files or folders) put into every run's save: the test project's ksp-crafts/, then the settings'.</summary>
         public List<string> Crafts = new List<string>();
+
+        /// <summary>CKAN identifiers every run's instance has: the project's KspMod items, then the settings'.</summary>
+        public List<string> Mods = new List<string>();
+
+        /// <summary>
+        ///     Local mods every run's instance has (the project's KspOverlay items and KspMod items that are paths, then the
+        ///     settings'): GameData/ModName folders, built from source (over CKAN's copy, if any) or not on CKAN.  Like the
+        ///     CKAN mods they decide which instance a run gets.
+        /// </summary>
+        public List<string> Overlays = new List<string>();
 
         /// <summary>"k=v;k=v" applied over every run's parameters.</summary>
         public string? Params;
@@ -53,7 +76,6 @@ namespace KspTest.Xunit
                     new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
                 JsonElement r = doc.RootElement;
                 s.Install = Str(r, "install") ?? s.Install;
-                s.Saves = Str(r, "saves") ?? s.Saves;
                 s.Results = Str(r, "results") ?? s.Results;
                 s.SaveBackups = Str(r, "saveBackups") ?? s.SaveBackups;
                 s.LockFile = Str(r, "lockFile") ?? s.LockFile;
@@ -68,10 +90,15 @@ namespace KspTest.Xunit
                         if (e.GetString() is string p)
                             s.Crafts.Add(p);
                 s.Params = Str(r, "params");
+                s.KspArgs = Str(r, "kspArgs");
+                s.Textures = Str(r, "textures");
+                if (r.TryGetProperty("mods", out JsonElement mods) && mods.ValueKind == JsonValueKind.Array)
+                    foreach (JsonElement e in mods.EnumerateArray())
+                        if (e.GetString() is string mod)
+                            s.Mods.Add(mod);
             }
 
             s.Install = Env("KSPDIR") ?? s.Install;
-            s.Saves = Env("KSPTEST_SAVES") ?? s.Saves;
             s.Results = Env("KSPTEST_RESULTS") ?? s.Results;
             s.LockFile = Env("KSPTEST_LOCK_FILE") ?? s.LockFile
                 ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KspTest", "ksp.lock");
@@ -80,6 +107,15 @@ namespace KspTest.Xunit
             if (Env("KSPTEST_CRAFTS") is string crafts)
                 s.Crafts.AddRange(crafts.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
             s.Params = Env("KSPTEST_PARAMS") ?? s.Params;
+            s.KspArgs = Env("KSPTEST_KSP_ARGS") ?? s.KspArgs;
+            s.Textures = Env("KSPTEST_TEXTURES") ?? s.Textures;
+            s.Mods.AddRange(InstanceManager.Split(Env("KSPTEST_MODS")));
+            // the project's KspMod and KspOverlay items, which the build wrote beside the tests
+            s.Mods.InsertRange(0, Lines(Path.Combine(baseDir, "ksptest-mods.txt")));
+            s.Overlays.AddRange(Lines(Path.Combine(baseDir, "ksptest-overlays.txt")));
+            // the settings' mods given as paths are local mods, like a KspMod item's
+            s.Overlays.AddRange(s.Mods.Where(InstanceManager.IsLocal).Select(m => Path.GetFullPath(Path.Combine(baseDir, m)).TrimEnd('/', '\\')));
+            s.Mods.RemoveAll(InstanceManager.IsLocal);
 
             s.Saves = Path.GetFullPath(Path.Combine(baseDir, s.Saves));
             s.Results = Path.GetFullPath(Path.Combine(baseDir, s.Results));
@@ -103,6 +139,9 @@ namespace KspTest.Xunit
                 }
             return s;
         }
+
+        private static IEnumerable<string> Lines(string file) =>
+            File.Exists(file) ? File.ReadAllLines(file).Select(l => l.Trim()).Where(l => l.Length > 0) : Enumerable.Empty<string>();
 
         private static string? Str(JsonElement e, string name) =>
             e.TryGetProperty(name, out JsonElement v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;

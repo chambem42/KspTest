@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <RootNamespace>KspTest.Far</RootNamespace>
+    <PackageId>KspTest.Far</PackageId>
+    <Description>KspTest helpers for FAR (Ferram Aerospace Research): its prediction API, flight forces, voxels, wing state, replays; FAR is reached by reflection, so this loads with or without it.</Description>
+    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
+    <!-- compile-time only: the harness itself is deployed into GameData by ksptest, never copied with a test assembly -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="ref/net48/" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KspTest/KspTest.csproj" Private="false" />
+  </ItemGroup>
+</Project>

@@ -50,7 +50,8 @@ namespace KspTest.Runner
 
         /// <summary>The running KSPs started from this install.</summary>
         public List<Process> Running() =>
-            RunningKsps().Where(p => PathOf(p)?.StartsWith(Root, StringComparison.OrdinalIgnoreCase) == true).ToList();
+            // the root and a separator: C:\Games\KSP is not C:\Games\KSP@1, a clone of it
+            RunningKsps().Where(p => PathOf(p)?.StartsWith(Root.TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) == true).ToList();
 
         public static string? PathOf(Process p)
         {

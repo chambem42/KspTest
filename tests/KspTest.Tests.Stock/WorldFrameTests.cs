@@ -18,7 +18,7 @@ namespace KspTest.Tests.Stock
     /// </summary>
     public static class WorldFrameTests
     {
-        [UITest("Solar_RevertCycle", StartsAt = StartState.Sph, Craft = "UITest_Plane", CraftDir = "SPH", TimeoutSec = 1800)]
+        [UITest(Kind = "Measure", StartsAt = StartState.Sph, Craft = "UITest_Plane", TimeoutSec = 1800)]
         public static IEnumerator Solar_RevertCycle(TestContext ctx)
         {
             int cycles = (int)ctx.ParamDouble("cycles", 3);
@@ -97,7 +97,7 @@ namespace KspTest.Tests.Stock
         /// stale Zup angle when it is not. First a runway launch warped and recovered, for a rotating scene straight into
         /// the rotating space centre. Params: padWarpHours (2), kscWarpHours (6).
         /// </summary>
-        [UITest("Frame_TrackingStation", StartsAt = StartState.Sph, Craft = "UITest_Plane", CraftDir = "SPH", TimeoutSec = 1800)]
+        [UITest(Kind = "Measure", StartsAt = StartState.Sph, Craft = "UITest_Plane", TimeoutSec = 1800)]
         public static IEnumerator Frame_TrackingStation(TestContext ctx)
         {
             double kscWarpHours = ctx.ParamDouble("kscWarpHours", 6);
@@ -165,7 +165,7 @@ namespace KspTest.Tests.Stock
         /// load of the save from there (the clock jumps back in a rotating scene) for surface/orbit consistency.
         /// Params: orbitKm (130), warpHours (2), kscWarpHours (3).
         /// </summary>
-        [UITest("Frame_LeaveRotating", StartsAt = StartState.Sph, Craft = "UITest_Plane", CraftDir = "SPH", TimeoutSec = 1800)]
+        [UITest(Kind = "Measure", StartsAt = StartState.Sph, Craft = "UITest_Plane", TimeoutSec = 1800)]
         public static IEnumerator Frame_LeaveRotating(TestContext ctx)
         {
             double orbitKm = ctx.ParamDouble("orbitKm", 130);

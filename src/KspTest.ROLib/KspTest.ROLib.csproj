@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <RootNamespace>KspTest</RootNamespace>
+    <PackageId>KspTest.ROLib</PackageId>
+    <Description>KspTest's tests of ROLib (the intake scaler), against RO's parts with AJE and FAR; by reflection, so this loads with or without them.</Description>
+    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
+    <!-- compile-time only: the harness itself is deployed into GameData by ksptest, never copied with a test assembly -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="ref/net48/" Visible="false" />
+    <!-- the crafts its tests fly, handed to a run with ksptest run's craft option (KSPTEST_CRAFTS) -->
+    <None Include="Tests/crafts/*.craft" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KspTest/KspTest.csproj" Private="false" />
+    <ProjectReference Include="../KspTest.Far/KspTest.Far.csproj" Private="false" />
+  </ItemGroup>
+</Project>

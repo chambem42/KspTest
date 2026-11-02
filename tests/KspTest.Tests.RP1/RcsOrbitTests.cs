@@ -16,7 +16,7 @@ namespace KspTest.Tests.RP1
         /// patch and the rest of its params). The SSTO is put on a circular orbit (altKm, default 160: above the air;
         /// inc 29.6, lan 161) by an RP-1 reentry sim, RCS on, propellant infinite.
         /// </summary>
-        [UITest("Rcs_RP1_OrbitHold", Requires = "RP-1,MechJeb", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big", TimeoutSec = 7200)]
+        [UITest(Requires = "RP-1,MechJeb", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big", TimeoutSec = 7200)]
         public static IEnumerator Rcs_RP1_OrbitHold(TestContext ctx)
         {
             Ugui.DismissPopups();
@@ -60,7 +60,7 @@ namespace KspTest.Tests.RP1
         /// x1,tc12,btw12, as Rcs_RP1_OrbitHold's): first with every ModuleAvionics dead (locked: expect no thrust), then
         /// with them restored (unlocked: the same command fires RCS, the control). Writes avionicslock.csv.
         /// </summary>
-        [UITest("Rcs_RP1_AvionicsLock", Requires = "RP-1", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big", TimeoutSec = 3600)]
+        [UITest(Requires = "RP-1", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big", TimeoutSec = 3600)]
         public static IEnumerator Rcs_RP1_AvionicsLock(TestContext ctx)
         {
             Ugui.DismissPopups();

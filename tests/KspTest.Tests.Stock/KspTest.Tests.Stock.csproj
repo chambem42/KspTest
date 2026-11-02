@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/KspTest/KspTest.csproj" Private="false" />
+    <ProjectReference Include="../../src/KspTest.Far/KspTest.Far.csproj" Private="false" />
   </ItemGroup>
 </Project>

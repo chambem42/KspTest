@@ -15,7 +15,8 @@ param(
     [string] $Install = 'D:\Games\KSP-Vanilla',
     # save template: a folder, or its name under KspTest\saves
     [string] $Save = 'stock-sandbox',
-    [string] $SaveFolder = 'ksptest',
+    # the install's save folder; empty: one named after the tests (ksptest-<Test>)
+    [string] $SaveFolder = '',
     [switch] $NoReset,
     [int] $TimeoutSec = 900,
     [switch] $Keep,
@@ -29,7 +30,9 @@ param(
     [int] $RunStallSec = 600,
     [int] $GcDivisor = 0,
     [switch] $Mute,
-    [int] $WaitForOtherKspSec = 7200
+    [int] $WaitForOtherKspSec = 7200,
+    # low-res textures outside screenshots: full, low or 0-3; empty: $env:KSPTEST_TEXTURES or full
+    [string] $Textures = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,14 +48,16 @@ if ($Params -is [hashtable]) { $Params = ($Params.GetEnumerator() | ForEach-Obje
 # the lock shared with the other KSP launchers on this machine sits beside this folder
 $lock = Join-Path (Split-Path $here -Parent) 'ksp.lock'
 $a = if ($Test -eq 'list') { @('list') } else { @('run', $Test) }
-$a += @('--install', $Install, '--save', $Save, '--saves', (Join-Path $here 'saves'), '--save-folder', $SaveFolder,
+$a += @('--install', $Install, '--save', $Save, '--saves', (Join-Path $here 'saves'),
         '--timeout', $TimeoutSec, '--width', $Width, '--height', $Height, '--results', $ResultsRoot,
         '--save-backups', (Join-Path $here 'save-backups'), '--lock', $lock, '--load-stall', $LoadStallSec,
         '--load-retries', $LoadRetries, '--run-stall', $RunStallSec, '--gc-divisor', $GcDivisor, '--wait', $WaitForOtherKspSec)
+if ($SaveFolder) { $a += @('--save-folder', $SaveFolder) }
 if ($Params) { $a += @('--params', $Params) }
 if ($NoReset) { $a += '--no-reset' }
 if ($Keep) { $a += '--keep' }
 if ($Mute) { $a += '--mute' }
+if ($Textures) { $a += @('--textures', $Textures) }
 
 & dotnet $tool @a
 exit $LASTEXITCODE

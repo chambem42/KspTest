@@ -29,12 +29,29 @@
     <ProjectReference Include="../KspTest.RP1/KspTest.RP1.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all"
                       Condition="$(_KspTestHasRP1)" />
     <ProjectReference Include="../KspTest.AtmosphereAutopilot/KspTest.AtmosphereAutopilot.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+    <ProjectReference Include="../KspTest.Far/KspTest.Far.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+    <ProjectReference Include="../KspTest.WaypointManager/KspTest.WaypointManager.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+    <ProjectReference Include="../KspTest.Trajectories/KspTest.Trajectories.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all" />
+    <!-- the modules built against MechJeb: built and carried, like KspTest.MechJeb, only when the install has it -->
+    <ProjectReference Include="../KspTest.Trajectories.MechJeb/KspTest.Trajectories.MechJeb.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all"
+                      Condition="$(_KspTestHasMechJeb)" />
+    <!-- the modules of tests that need RP-1 (and MechJeb), the same way -->
+    <ProjectReference Include="../KspTest.Trajectories.RP1/KspTest.Trajectories.RP1.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all"
+                      Condition="$(_KspTestHasMechJeb) and $(_KspTestHasRP1)" />
+    <ProjectReference Include="../KspTest.WaypointManager.RP1/KspTest.WaypointManager.RP1.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" PrivateAssets="all"
+                      Condition="$(_KspTestHasRP1)" />
   </ItemGroup>
   <ItemGroup>
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.dll" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.MechJeb.dll" Condition="$(_KspTestHasMechJeb)" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.RP1.dll" Condition="$(_KspTestHasRP1)" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.AtmosphereAutopilot.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.Far.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.WaypointManager.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.Trajectories.dll" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.Trajectories.MechJeb.dll" Condition="$(_KspTestHasMechJeb)" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.Trajectories.RP1.dll" Condition="$(_KspTestHasMechJeb) and $(_KspTestHasRP1)" />
+    <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/KspTest.WaypointManager.RP1.dll" Condition="$(_KspTestHasRP1)" />
     <HarnessFile Include="$(MSBuildThisFileDirectory)../../GameData/KspTest/KspTest.version" />
     <None Include="@(HarnessFile)" Pack="true" PackagePath="gamedata/KspTest/%(Filename)%(Extension)" Visible="false" />
     <!-- and beside whatever references this project (the tool, a test project using KspTest from source), where

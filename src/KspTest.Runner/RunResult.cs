@@ -27,7 +27,9 @@ namespace KspTest.Runner
 
         public bool Passed => Status == "pass" || Status == "skipped";
 
-        public TestResult? this[string test] => Tests.FirstOrDefault(t => t.Test == test);
+        /// <summary>The result of the test asked for by that name (as requested, by its name, or by its Id).</summary>
+        public TestResult? this[string test] =>
+            Tests.FirstOrDefault(t => t.Requested == test) ?? Tests.FirstOrDefault(t => t.Test == test || t.Id == test);
 
         public static RunResult Read(string resultsDir, string fallbackStatus)
         {
@@ -39,14 +41,32 @@ namespace KspTest.Runner
                 return r;
             }
 
-            using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(file));
-            JsonElement root = doc.RootElement;
-            r.Status = Str(root, "status") ?? "unknown";
-            r.DurationSec = Num(root, "durationSec");
-            r.Scene = Str(root, "scene");
-            if (root.TryGetProperty("tests", out JsonElement tests))
-                foreach (JsonElement t in tests.EnumerateArray())
-                    r.Tests.Add(TestResult.From(t));
+            JsonDocument doc;
+            try
+            {
+                doc = JsonDocument.Parse(File.ReadAllText(file));
+            }
+            catch (JsonException)
+            {
+                // KSP killed while the harness was writing it
+                r.Status = fallbackStatus == "unknown" ? "no-result" : fallbackStatus;
+                return r;
+            }
+
+            using (doc)
+            {
+                JsonElement root = doc.RootElement;
+                r.Status = Str(root, "status") ?? "unknown";
+                // a harness still "running" did not end the run: the runner did (timeout, frozen) and says why, or KSP
+                // exited by itself (no-result, which the runner looks into for a crash)
+                if (r.Status == "running")
+                    r.Status = fallbackStatus == "unknown" ? "no-result" : fallbackStatus;
+                r.DurationSec = Num(root, "durationSec");
+                r.Scene = Str(root, "scene");
+                if (root.TryGetProperty("tests", out JsonElement tests))
+                    foreach (JsonElement t in tests.EnumerateArray())
+                        r.Tests.Add(TestResult.From(t));
+            }
 
             string log = Path.Combine(resultsDir, "KSP.log");
             if (File.Exists(log))
@@ -67,6 +87,24 @@ namespace KspTest.Runner
             }
 
             return r;
+        }
+
+        /// <summary>The tests in a result.json the harness may still be writing: none where it is cut short.</summary>
+        public static List<TestResult> ParseTests(string json)
+        {
+            var tests = new List<TestResult>();
+            try
+            {
+                using JsonDocument doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("tests", out JsonElement t))
+                    foreach (JsonElement e in t.EnumerateArray())
+                        tests.Add(TestResult.From(e));
+            }
+            catch (JsonException)
+            {
+            }
+
+            return tests;
         }
 
         public string Report()
@@ -95,7 +133,10 @@ namespace KspTest.Runner
 
     public sealed class TestResult
     {
+        /// <summary>What the test goes by (its method name where that is unique), its Namespace.Class.Method, and the name it was asked for by.</summary>
         public string Test = "";
+        public string Id = "";
+        public string? Requested;
         public string Status = "";
         public string Message = "";
         public double DurationSec;
@@ -113,6 +154,8 @@ namespace KspTest.Runner
             var r = new TestResult
             {
                 Test = RunResult.Str(t, "test") ?? "",
+                Id = RunResult.Str(t, "id") ?? RunResult.Str(t, "test") ?? "",
+                Requested = RunResult.Str(t, "requested"),
                 Status = RunResult.Str(t, "status") ?? "",
                 Message = RunResult.Str(t, "message") ?? "",
                 DurationSec = RunResult.Num(t, "durationSec"),

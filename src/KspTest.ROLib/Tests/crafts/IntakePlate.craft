@@ -1,0 +1,713 @@
+ship = Intake Plate
+version = 1.12.5
+description = Each intake (left) beside a smaller one of the same type scaled up to its AJE area (right).
+type = SPH
+size = 26.0,3,26.0
+steamPublishedFileId = 0
+persistentId = 41000001
+rot = 0,0,0,0
+missionFlag = Squad/Flags/default
+vesselType = Debris
+OverrideDefault = False,False,False,False
+OverrideActionControl = 0,0,0,0
+OverrideAxisControl = 0,0,0,0
+OverrideGroupNames = ,,,
+PART
+{
+	part = proceduralStructural_4100000001
+	partName = Part
+	persistentId = 100000001
+	pos = 0,2,0
+	attPos = 0,0,0
+	attPos0 = 0,2,0
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	link = airScoop_4100000002
+	link = LRadialAirIntake_4100000003
+	link = airScoop_4100000004
+	link = RO-IntakeRadialLongPitot_4100000005
+	link = CircularIntake_4100000006
+	link = miniIntake_4100000007
+	link = CircularIntake_4100000008
+	link = SXTInlineAirIntake_4100000009
+	link = RO-shockConeIntakeMig_4100000010
+	link = RO-shockConeIntakeBomarc_4100000011
+	link = RO-shockConeIntake125_4100000012
+	link = RO-shockConeIntakeBomarc_4100000013
+	link = RO-shockConeIntake125_4100000014
+	link = RO-shockConeIntakeMig_4100000015
+	link = LRadialAirIntake_4100000016
+	link = RO-IntakeRadialLongPitot_4100000017
+	link = RO-shockConeIntakeMig_4100000018
+	link = SXTRadialAirIntakeShockCone_4100000019
+	link = ramAirIntake_4100000020
+	link = IntakeRadialLong_4100000021
+	link = shockConeIntake_4100000022
+	link = RO-shockConeIntake125_4100000023
+	attN = top,Null_0_0|0.1|0_0|1|0_0|0.1|0_0|1|0
+	attN = bottom,Null_0_0|-0.1|0_0|-1|0_0|-0.1|0_0|-1|0
+	MODULE
+	{
+		name = ProceduralPart
+		isEnabled = True
+		shapeName = Cylinder
+	}
+	MODULE
+	{
+		name = ProceduralShapeCylinder
+		isEnabled = True
+		diameter = 26.0
+		length = 0.2
+	}
+}
+PART
+{
+	part = airScoop_4100000002
+	partName = Part
+	persistentId = 100000002
+	pos = -3.276771,2.437066,9.087876
+	attPos = 0,0,0
+	attPos0 = -3.276771,0.4370661,9.087876
+	rot = -1,0,0,2.220446e-16
+	attRot = 0,0,0,1
+	attRot0 = -1,0,0,2.220446e-16
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 1
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	srfN = srfAttach,proceduralStructural_4100000001,collider,0|0.3370661|0,0|1|0,0|0|0
+}
+PART
+{
+	part = LRadialAirIntake_4100000003
+	partName = Part
+	persistentId = 100000003
+	pos = -1.152582,2.126944,9.087876
+	attPos = 0,0,0
+	attPos0 = -1.152582,0.1269444,9.087876
+	rot = 0,0.7071068,-0.7071068,0
+	attRot = 0,0,0,1
+	attRot0 = 0,0.7071068,-0.7071068,0
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 1
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	srfN = srfAttach,proceduralStructural_4100000001,collider,0|0|0.02694439,0|0|-1,0|0|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.2247
+		scaleHeight = 1.2247
+		scaleLength = 1.2247
+	}
+}
+PART
+{
+	part = airScoop_4100000004
+	partName = Part
+	persistentId = 100000004
+	pos = -2.92397,2.437066,3.657476
+	attPos = 0,0,0
+	attPos0 = -2.92397,0.4370661,3.657476
+	rot = -1,0,0,2.220446e-16
+	attRot = 0,0,0,1
+	attRot0 = -1,0,0,2.220446e-16
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 1
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	srfN = srfAttach,proceduralStructural_4100000001,collider,0|0.3370661|0,0|1|0,0|0|0
+}
+PART
+{
+	part = RO-IntakeRadialLongPitot_4100000005
+	partName = Part
+	persistentId = 100000005
+	pos = -1.152582,2.1,3.657476
+	attPos = 0,0,0
+	attPos0 = -1.152582,0.1,3.657476
+	rot = -1,0,0,2.220446e-16
+	attRot = 0,0,0,1
+	attRot0 = -1,0,0,2.220446e-16
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 1
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	srfN = srfAttach,proceduralStructural_4100000001,collider,0|0|0,0|1|0,0|0|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.3360
+		scaleHeight = 1.3360
+		scaleLength = 1.3360
+	}
+}
+PART
+{
+	part = CircularIntake_4100000006
+	partName = Part
+	persistentId = 100000006
+	pos = -3.18836,2.1,-1.371423
+	attPos = 0,0,0
+	attPos0 = -3.18836,0.1,-1.371423
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom01,proceduralStructural_4100000001_0|0|0|0_0|-1|0_0|0|0_0|-1|0
+}
+PART
+{
+	part = miniIntake_4100000007
+	partName = Part
+	persistentId = 100000007
+	pos = -1.139582,2.1,-1.371423
+	attPos = 0,0,0
+	attPos0 = -1.139582,0.1,-1.371423
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom01,proceduralStructural_4100000001_0|0|0|0_0|-1|0_0|0|0_0|-1|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.9961
+		scaleHeight = 1.9961
+		scaleLength = 1.9961
+	}
+}
+PART
+{
+	part = CircularIntake_4100000008
+	partName = Part
+	persistentId = 100000008
+	pos = -3.304164,2.1,-3.544252
+	attPos = 0,0,0
+	attPos0 = -3.304164,0.1,-3.544252
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom01,proceduralStructural_4100000001_0|0|0|0_0|-1|0_0|0|0_0|-1|0
+}
+PART
+{
+	part = SXTInlineAirIntake_4100000009
+	partName = Part
+	persistentId = 100000009
+	pos = -1.139582,2.1,-3.544252
+	attPos = 0,0,0
+	attPos0 = -1.139582,0.1,-3.544252
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom01,proceduralStructural_4100000001_0|0|0|0_0|-1|0_0|0|0_0|-1|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.0308
+		scaleHeight = 1.0308
+		scaleLength = 1.0308
+	}
+}
+PART
+{
+	part = RO-shockConeIntakeMig_4100000010
+	partName = Part
+	persistentId = 100000010
+	pos = -3.003711,2.53125,-5.531209
+	attPos = 0,0,0
+	attPos0 = -3.003711,0.53125,-5.531209
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-0.43125|0_0|-1|0_0|-0.43125|0_0|-1|0
+}
+PART
+{
+	part = RO-shockConeIntakeBomarc_4100000011
+	partName = Part
+	persistentId = 100000011
+	pos = -1.326082,2.531728,-5.531209
+	attPos = 0,0,0
+	attPos0 = -1.326082,0.5317282,-5.531209
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-0.4317282|0_0|-1|0_0|-0.4317282|0_0|-1|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.2335
+		scaleHeight = 1.2335
+		scaleLength = 1.2335
+	}
+}
+PART
+{
+	part = RO-shockConeIntake125_4100000012
+	partName = Part
+	persistentId = 100000012
+	pos = -3.200601,2.725,-7.406357
+	attPos = 0,0,0
+	attPos0 = -3.200601,0.725,-7.406357
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-0.625|0_0|-1|0_0|-0.625|0_0|-1|0
+}
+PART
+{
+	part = RO-shockConeIntakeBomarc_4100000013
+	partName = Part
+	persistentId = 100000013
+	pos = -1.128582,2.725299,-7.406357
+	attPos = 0,0,0
+	attPos0 = -1.128582,0.7252992,-7.406357
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-0.6252992|0_0|-1|0_0|-0.6252992|0_0|-1|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.7866
+		scaleHeight = 1.7866
+		scaleLength = 1.7866
+	}
+}
+PART
+{
+	part = RO-shockConeIntake125_4100000014
+	partName = Part
+	persistentId = 100000014
+	pos = -3.199689,2.725,-9.478376
+	attPos = 0,0,0
+	attPos0 = -3.199689,0.725,-9.478376
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-0.625|0_0|-1|0_0|-0.625|0_0|-1|0
+}
+PART
+{
+	part = RO-shockConeIntakeMig_4100000015
+	partName = Part
+	persistentId = 100000015
+	pos = -1.128582,2.724607,-9.478376
+	attPos = 0,0,0
+	attPos0 = -1.128582,0.7246065,-9.478376
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-0.6246065|0_0|-1|0_0|-0.6246065|0_0|-1|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.4484
+		scaleHeight = 1.4484
+		scaleLength = 1.4484
+	}
+}
+PART
+{
+	part = LRadialAirIntake_4100000016
+	partName = Part
+	persistentId = 100000016
+	pos = 2.296885,2.122,8.258492
+	attPos = 0,0,0
+	attPos0 = 2.296885,0.122,8.258492
+	rot = 0,0.7071068,-0.7071068,0
+	attRot = 0,0,0,1
+	attRot0 = 0,0.7071068,-0.7071068,0
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 1
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	srfN = srfAttach,proceduralStructural_4100000001,collider,0|0|0.022,0|0|-1,0|0|0
+}
+PART
+{
+	part = RO-IntakeRadialLongPitot_4100000017
+	partName = Part
+	persistentId = 100000017
+	pos = 3.971824,2.1,8.258492
+	attPos = 0,0,0
+	attPos0 = 3.971824,0.1,8.258492
+	rot = -1,0,0,2.220446e-16
+	attRot = 0,0,0,1
+	attRot0 = -1,0,0,2.220446e-16
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 1
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	srfN = srfAttach,proceduralStructural_4100000001,collider,0|0|0,0|1|0,0|0|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.0909
+		scaleHeight = 1.0909
+		scaleLength = 1.0909
+	}
+}
+PART
+{
+	part = RO-shockConeIntakeMig_4100000018
+	partName = Part
+	persistentId = 100000018
+	pos = 2.092521,2.53125,3.205367
+	attPos = 0,0,0
+	attPos0 = 2.092521,0.53125,3.205367
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-0.43125|0_0|-1|0_0|-0.43125|0_0|-1|0
+}
+PART
+{
+	part = SXTRadialAirIntakeShockCone_4100000019
+	partName = Part
+	persistentId = 100000019
+	pos = 3.828824,2.1,3.205367
+	attPos = 0,0,0
+	attPos0 = 3.828824,0.1,3.205367
+	rot = 0,0.7071068,-0.7071068,0
+	attRot = 0,0,0,1
+	attRot0 = 0,0.7071068,-0.7071068,0
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 1
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	srfN = srfAttach,proceduralStructural_4100000001,collider,0|0|0,0|0|-1,0|0|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.0917
+		scaleHeight = 1.0917
+		scaleLength = 1.0917
+	}
+}
+PART
+{
+	part = ramAirIntake_4100000020
+	partName = Part
+	persistentId = 100000020
+	pos = 2.126356,2.1,-3.557801
+	attPos = 0,0,0
+	attPos0 = 2.126356,0.1,-3.557801
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom01,proceduralStructural_4100000001_0|0|0|0_0|-1|0_0|0|0_0|-1|0
+}
+PART
+{
+	part = IntakeRadialLong_4100000021
+	partName = Part
+	persistentId = 100000021
+	pos = 4.015324,2.1,-3.557801
+	attPos = 0,0,0
+	attPos0 = 4.015324,0.1,-3.557801
+	rot = -1,0,0,2.220446e-16
+	attRot = 0,0,0,1
+	attRot0 = -1,0,0,2.220446e-16
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 1
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	srfN = srfAttach,proceduralStructural_4100000001,collider,0|0|0,0|1|0,0|0|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.7248
+		scaleHeight = 1.7248
+		scaleLength = 1.7248
+	}
+}
+PART
+{
+	part = shockConeIntake_4100000022
+	partName = Part
+	persistentId = 100000022
+	pos = 1.495,3.176389,-10.10574
+	attPos = 0,0,0
+	attPos0 = 1.495,1.176389,-10.10574
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-1.076389|0_0|-1|0_0|-1.076389|0_0|-1|0
+}
+PART
+{
+	part = RO-shockConeIntake125_4100000023
+	partName = Part
+	persistentId = 100000023
+	pos = 4.485324,3.17638,-10.10574
+	attPos = 0,0,0
+	attPos0 = 4.485324,1.17638,-10.10574
+	rot = 0,0,0,1
+	attRot = 0,0,0,1
+	attRot0 = 0,0,0,1
+	mir = 1,1,1
+	symMethod = Radial
+	istg = -1
+	resPri = 0
+	dstg = 0
+	sidx = -1
+	sqor = -1
+	sepI = -1
+	attm = 0
+	modCost = 0
+	modMass = 0
+	modSize = 0,0,0
+	attN = bottom,proceduralStructural_4100000001_0|0|-1.07638|0_0|-1|0_0|-1.07638|0_0|-1|0
+	MODULE
+	{
+		name = ModuleROIntakeScale
+		isEnabled = True
+		scaleWidth = 1.7222
+		scaleHeight = 1.7222
+		scaleLength = 1.7222
+	}
+}

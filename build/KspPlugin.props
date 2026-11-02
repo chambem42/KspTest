@@ -13,6 +13,9 @@
   <ItemGroup>
     <!-- net48 reference assemblies, so the projects build with dotnet build on any OS -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <!-- Harmony to compile against, the version CKAN's Harmony2 installs (2.2.1.0): a stock install has none, and the game
+         loads the one in GameData/000_Harmony, so it is neither copied nor passed on -->
+    <PackageReference Include="Lib.Harmony" Version="2.2.1" ExcludeAssets="runtime" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,6 +30,5 @@
     <Reference Include="UnityEngine.ScreenCaptureModule" HintPath="$(KspManaged)/UnityEngine.ScreenCaptureModule.dll" Private="false" />
     <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(KspManaged)/UnityEngine.InputLegacyModule.dll" Private="false" />
     <Reference Include="UnityEngine.PhysicsModule" HintPath="$(KspManaged)/UnityEngine.PhysicsModule.dll" Private="false" />
-    <Reference Include="0Harmony" HintPath="$(KspGameData)/000_Harmony/0Harmony.dll" Private="false" />
   </ItemGroup>
 </Project>

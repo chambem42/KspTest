@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using KspTest;
 using UnityEngine;
 
@@ -14,8 +15,8 @@ namespace KspTest.Tests.Stock
     /// </summary>
     public static class PwTests
     {
-        private const System.Reflection.BindingFlags Any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
-                                                            System.Reflection.BindingFlags.NonPublic;
+        private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        private const BindingFlags AnyStatic = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
         private static PartModule Module(Part p, string name) => p.Modules.Cast<PartModule>().FirstOrDefault(m => m.moduleName == name);
 
@@ -39,12 +40,10 @@ namespace KspTest.Tests.Stock
         /// </summary>
         private static void OpenPanel(Part p)
         {
-            PartModule wp = Module(p, "WingProcedural");
-            Type t = wp.GetType();
-            t.GetField("uiInstanceIDTarget", Any | System.Reflection.BindingFlags.Static).SetValue(null, p.GetInstanceID());
-            t.GetField("uiWindowActive", Any | System.Reflection.BindingFlags.Static).SetValue(null, true);
-            t.GetField("uiEditMode", Any | System.Reflection.BindingFlags.Static).SetValue(null, true);
-            t.GetField("uiAdjustWindow", Any | System.Reflection.BindingFlags.Static).SetValue(null, true);
+            Type t = Module(p, "WingProcedural").GetType();
+            t.GetField("uiInstanceIDTarget", AnyStatic).SetValue(null, p.GetInstanceID());
+            foreach (string flag in new[] { "uiWindowActive", "uiEditMode", "uiAdjustWindow" })
+                t.GetField(flag, AnyStatic).SetValue(null, true);
         }
 
         private static IEnumerator Shots(TestContext ctx, string name, string[] views, double distance)
@@ -67,14 +66,13 @@ namespace KspTest.Tests.Stock
         /// 100 only. Writes the craft to the save's Ships/SPH and to the results as craftName (default
         /// "Stearwing A300 PW"). Params: bisect (0.6), craftName, distance (camera, m; default 95).
         /// </summary>
-        [UITest("Pw_BuildStearwing", StartsAt = StartState.Sph, Craft = "Stearwing A300 PW base", CraftDir = "SPH", TimeoutSec = 600)]
+        [UITest(Kind = "Measure", Requires = "FAR", Mods = "FerramAerospaceResearchContinued;B9-PWings-Fork", StartsAt = StartState.Sph, Craft = "Stearwing A300 PW base", TimeoutSec = 600)]
         public static IEnumerator Pw_BuildStearwing(TestContext ctx)
         {
             var inv = CultureInfo.InvariantCulture;
             double bisect = ctx.ParamDouble("bisect", 0.6), distance = ctx.ParamDouble("distance", 95);
             string craftName = ctx.Param("craftName", "Stearwing A300 PW");
             string[] views = { "top", "quarter" };
-            Ugui.DismissPopups();
             yield return Wait.Seconds(3);
             var ship = EditorLogic.fetch.ship;
             Vector3 right = ship.parts[0].transform.right;
@@ -83,7 +81,7 @@ namespace KspTest.Tests.Stock
 
             ctx.Step("Split the trailing edge");
             Part wing = ship.parts.Where(p => Module(p, "WingProcedural") != null && !IsCtrlSrf(p)).OrderBy(Span).First();
-            Assert.True(wing.symmetryCounterparts.Count == 1, $"the wing has its mirror ({wing.symmetryCounterparts.Count})");
+            Assert.Equal(1, wing.symmetryCounterparts.Count, "the wing's mirror");
             OpenPanel(wing);
             yield return Wait.Seconds(1);
             // The stock Stearwing's fuel is in its wings: the procedural wings get a liquid-fuel tank (the panel's tank
@@ -95,7 +93,7 @@ namespace KspTest.Tests.Stock
             yield return Wait.Seconds(2);
             var ctrls = ship.parts.Where(IsCtrlSrf).ToList();
             ctx.Record("afterSplit.controls", ctrls.Count);
-            Assert.True(ctrls.Count == 2, $"split made a control on each side ({ctrls.Count})");
+            Assert.Equal(2, ctrls.Count, "split made a control on each side");
             yield return Shots(ctx, "split", views, distance);
 
             ctx.Step("Bisect the control");
@@ -104,17 +102,16 @@ namespace KspTest.Tests.Stock
             yield return Wait.Seconds(1);
             PartModule ctrlWp = Module(ctrl, "WingProcedural");
             ctx.Record("panel", string.Format(inv, "target {0}, control {1}, wing {2}; windows: {3}",
-                ctrlWp.GetType().GetField("uiInstanceIDTarget", Any | System.Reflection.BindingFlags.Static).GetValue(null), ctrl.GetInstanceID(), wing.GetInstanceID(),
+                ctrlWp.GetType().GetField("uiInstanceIDTarget", AnyStatic).GetValue(null), ctrl.GetInstanceID(), wing.GetInstanceID(),
                 string.Join(" | ", Imgui.VisibleWindows().Select(w => w.Title))));
             yield return Snap.Shot(ctx, "control-panel");
-            PartModule cm = Module(ctrl, "WingProcedural");
-            var api = cm.GetType().GetMethod("BisectAtFraction", Any);
+            var api = ctrlWp.GetType().GetMethod("BisectAtFraction", Any);
             Assert.True(api != null, "B9 has BisectAtFraction");
-            api.Invoke(cm, new object[] { (float)bisect });
+            api.Invoke(ctrlWp, new object[] { (float)bisect });
             yield return Wait.Seconds(2);
             ctrls = ship.parts.Where(IsCtrlSrf).ToList();
             ctx.Record("afterBisect.controls", ctrls.Count);
-            Assert.True(ctrls.Count == 4, $"bisect made an outboard control on each side ({ctrls.Count})");
+            Assert.Equal(4, ctrls.Count, "bisect made an outboard control on each side");
             foreach (Part c in ctrls)
                 ctx.Record($"control.{c.flightID % 10000}", string.Format(inv, "span {0:+0.00;-0.00} m, length {1}", Span(c), Field(Module(c, "WingProcedural"), "sharedBaseLength")));
 
@@ -183,17 +180,16 @@ namespace KspTest.Tests.Stock
         /// and the procedural wings' shape fields and FAR's wing figures for them. Params: views ("+"-separated, default
         /// top+quarter+nose), crafts ("+"-separated, default both).
         /// </summary>
-        [UITest("Pw_StearwingShots", StartsAt = StartState.Sph, Craft = "Stearwing A300 PW base", CraftDir = "SPH", TimeoutSec = 600)]
+        [UITest(Kind = "Measure", Requires = "FAR", Mods = "FerramAerospaceResearchContinued;B9-PWings-Fork", StartsAt = StartState.Sph, Craft = "Stearwing A300 PW base", TimeoutSec = 600)]
         public static IEnumerator Pw_StearwingShots(TestContext ctx)
         {
             var inv = CultureInfo.InvariantCulture;
-            string[] views = (ctx.Param("views") ?? "top+quarter+nose").Split('+');
-            string[] crafts = (ctx.Param("crafts") ?? "Stearwing A300 PW+Stearwing A300").Split('+');
+            string[] views = ctx.ParamList("views", "top+quarter+nose");
+            string[] crafts = ctx.ParamList("crafts", "Stearwing A300 PW+Stearwing A300");
             foreach (string craft in crafts)
             {
                 ctx.Step("Craft " + craft);
                 yield return Nav.EnsureState(ctx, StartState.Sph, ctx.CraftPath(craft, "SPH"));
-                Ugui.DismissPopups();
                 yield return Wait.Seconds(5);
                 var parts = EditorLogic.fetch.ship.parts;
                 ctx.Record(craft + ".parts", parts.Count);
@@ -211,12 +207,7 @@ namespace KspTest.Tests.Stock
                 }
                 Bounds b = CraftBounds(parts);
                 ctx.Record(craft + ".bounds", string.Format(inv, "{0:F2} x {1:F2} x {2:F2} m", b.size.x, b.size.y, b.size.z));
-                foreach (string view in views)
-                {
-                    Nav.EditorCamera(view.Trim(), b, 20, 0.9, 20, ctx.ParamDouble("distance", 95));
-                    yield return Wait.Seconds(1);
-                    yield return Snap.Shot(ctx, $"{craft}-{view.Trim()}");
-                }
+                yield return Shots(ctx, craft, views, ctx.ParamDouble("distance", 95));
             }
         }
     }

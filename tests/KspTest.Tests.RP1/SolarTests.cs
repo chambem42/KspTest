@@ -19,7 +19,7 @@ namespace KspTest.Tests.RP1
     /// </summary>
     public static class SolarTests
     {
-        [UITest("Solar_Occlusion", Requires = "RP-1", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big NoShroud", TimeoutSec = 900)]
+        [UITest(Requires = "RP-1", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big NoShroud", TimeoutSec = 900)]
         public static IEnumerator Solar_Occlusion(TestContext ctx)
         {
             double orbitAltKm = ctx.ParamDouble("orbitAltKm", 300);

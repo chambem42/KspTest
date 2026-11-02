@@ -9,7 +9,8 @@ using UnityEngine;
 namespace KspTest.RP1
 {
     /// <summary>
-    /// Registers the KCT simulation flow as the harness's Launch() implementation when RP-1 is loaded.
+    /// Registers the KCT simulation flow as the harness's Launch() implementation when RP-1 is loaded, and has
+    /// Nav.NewGame make a career the tests can build and fly anything in (<see cref="Rp1Career" />).
     /// </summary>
     [KSPAddon(KSPAddon.Startup.Instantly, true)]
     public class Rp1Integration : MonoBehaviour
@@ -18,8 +19,10 @@ namespace KspTest.RP1
         {
             // simFailures=false unticks the sim's "Enable Part Failures": it starts ticked whatever the save's
             // DisableFailuresInSim says, so TestFlight failures (ignitions included) are on in a sim unless this is set
+            // a game whose preset disables KCT (RP-1's sandbox) launches with the stock button
             Nav.LaunchOverride = ctx =>
             {
+                if (KCT_GUI.IsPrimarilyDisabled) return null;
                 var spec = SimSpec.OnPad();
                 string f = ctx.Param("simFailures")?.Trim().ToLowerInvariant();
                 if (f != null) spec.Failures = f == "on" || f == "true" || f == "1";
@@ -27,6 +30,8 @@ namespace KspTest.RP1
             };
             // a KCT simulation must not be saved or recovered: just leave, RP-1 restores its backup save
             Nav.LeaveFlightOverride = ctx => Rp1.IsSimulatedFlight ? Rp1.LeaveSimulation(ctx) : null;
+            Nav.NewGameParameters.Add(Rp1Career.SetParameters);
+            Nav.NewGameReady.Add(Rp1Career.Ready);
             Log.Info("RP-1 integration: Launch() = KCT simulation on the pad");
             Destroy(this);
         }
@@ -290,13 +295,13 @@ namespace KspTest.RP1
         // ---- editor reentry analysis (FAR's editor window, "Reentry" tab; chambm's FAR fork) ----
 
         public const string FarWindowTitle = "FAR Analysis";
-        private static Type FarReentryApi => Reflect.FindType("FerramAerospaceResearch.Reentry.FARReentryAPI") ?? throw new UITestFailure("this FAR has no FARReentryAPI (reentry analysis tab)");
+        private static Type FarReentryApi => Reflect.TryFindType("FerramAerospaceResearch.Reentry.FARReentryAPI") ?? throw new UITestFailure("this FAR has no FARReentryAPI (reentry analysis tab)");
 
         /// <summary>Opens FAR's editor window on its Reentry tab (editor only) and returns the tab object.</summary>
         public static IEnumerator ShowReentryTab()
         {
             if (!HighLogic.LoadedSceneIsEditor) throw new UITestFailure("ShowReentryTab: not in the editor");
-            var egType = Reflect.FindType("FerramAerospaceResearch.FARGUI.FAREditorGUI.EditorGUI") ?? throw new UITestFailure("FAR EditorGUI type not found");
+            var egType = Reflect.TryFindType("FerramAerospaceResearch.FARGUI.FAREditorGUI.EditorGUI") ?? throw new UITestFailure("FAR EditorGUI type not found");
             object eg = Reflect.GetStatic(egType, "Instance") ?? throw new UITestFailure("FAR EditorGUI.Instance is null");
             Reflect.SetStatic(egType, "showGUI", true);
             // The mode dropdown is a custom control the IMGUI driver cannot click; pick the entry directly.

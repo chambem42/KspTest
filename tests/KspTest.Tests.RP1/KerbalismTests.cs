@@ -22,7 +22,7 @@ namespace KspTest.Tests.RP1
         /// against the sum of every broker's rate. Asserts, in every state, the avionics broker within 1 % of the request
         /// (of 0 when RP-1 leaves the draw to ModuleCommand) and the stored charge's fall within 1 % of the brokers. Writes avionics_power.csv (one row per sample).
         /// </summary>
-        [UITest("Kerb_AvionicsPower", Requires = "RP-1", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big", TimeoutSec = 1200)]
+        [UITest(Requires = "RP-1", StartsAt = StartState.Vab, Craft = "Mk2 SSTO Big", TimeoutSec = 1200)]
         public static IEnumerator Kerb_AvionicsPower(TestContext ctx)
         {
             Ugui.DismissPopups();
@@ -73,7 +73,7 @@ namespace KspTest.Tests.RP1
             Ugui.DismissPopups();
             // RP-1's AvionicsUseKerbalism (default off) decides whether the avionics draw goes through Kerbalism
             // (ResourceUpdate) or through ModuleCommand; avionicsKerbalism=on|off sets it before the vessel starts
-            bool viaKerbalism = !(ctx.Param("avionicsKerbalism", "on") ?? "on").Equals("off", StringComparison.OrdinalIgnoreCase);
+            bool viaKerbalism = !!ctx.ParamBool("avionicsKerbalism", true);
             HighLogic.CurrentGame.Parameters.CustomParams<RP0.RP0Settings>().AvionicsUseKerbalism = viaKerbalism;
             ctx.Record("avionicsUseKerbalism", viaKerbalism);
             yield return Rp1.ConfigureSim(SimSpec.Circular(300, 28.6));

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>KspTest.AtmosphereAutopilot</RootNamespace>
     <PackageId>KspTest.AtmosphereAutopilot</PackageId>
-    <Description>KspTest helpers that fly on AtmosphereAutopilot (cruise, its controllers' state) from tests of any mod; AA is reached by reflection, so this loads with or without it.</Description>
+    <Description>KspTest helpers that fly on AtmosphereAutopilot (cruise, its controllers' state, the fly and aafly Serve requests) from tests of any mod; AA is reached by reflection, so this loads with or without it.</Description>
     <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
     <!-- compile-time only: the harness itself is deployed into GameData by ksptest, never copied with a test assembly -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
@@ -13,5 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../KspTest/KspTest.csproj" Private="false" />
+    <!-- the fly request air-starts through its probes; both load anywhere -->
+    <ProjectReference Include="../KspTest.Far/KspTest.Far.csproj" Private="false" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <RootNamespace>KspTest</RootNamespace>
+    <PackageId>KspTest.WaypointManager.RP1</PackageId>
+    <Description>WaypointManager's tests in an RP-1 (KCT) simulation: how often it rebuilds its waypoint groups. Needs RP-1.</Description>
+    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
+    <!-- compile-time only: the harness itself is deployed into GameData by ksptest, never copied with a test assembly -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="ref/net48/" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KspTest/KspTest.csproj" Private="false" />
+    <ProjectReference Include="../KspTest.RP1/KspTest.RP1.csproj" Private="false" />
+    <ProjectReference Include="../KspTest.WaypointManager/KspTest.WaypointManager.csproj" Private="false" />
+    <Reference Include="RP0" HintPath="$(KspGameData)/RP-1/Plugins/RP0.dll" Private="false" />
+  </ItemGroup>
+</Project>

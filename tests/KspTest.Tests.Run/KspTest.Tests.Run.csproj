@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+      KspTest's own in-game tests (KspTest.Tests.Stock) with dotnet test: every [UITest] there is a test here, made by
+      KspTest.Xunit's generator, on a new sandbox game with the crafts below in its SPH (dotnet test filter Kind=Check
+      for the harness's checks, Kind=Measure for the long ones). With no install configured (KSPDIR, or "install" in a
+      ksptest.json beside this file) they run in KSP instances KspTest makes, once ksptest setup has asked which KSP
+      install to copy, which CKAN to use and where the instances go (until then they skip and say so). Every instance
+      has TimeControl (and Harmony, which the harness needs), and each test the mods its [UITest(Mods)] names.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- built and copied to ksp-plugins/<name>/ for the runner to deploy; its [UITest]s become this project's tests -->
+    <ProjectReference Include="../KspTest.Tests.Stock/KspTest.Tests.Stock.csproj"
+                      ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="KspTestPlugin" />
+    <!-- the local mod SetupTests.Mods_Local names (by its GameData folder), only built -->
+    <ProjectReference Include="../KspTest.LocalMod/KspTest.LocalMod.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TimeControl's hyper-warp speeds up Ctrl_BarrelRoll; the project's mods are every test's, so they share an instance -->
+    <KspMod Include="TimeControl" />
+    <!-- the stock aircraft the editor, PAW and flight tests use, and the Stearwings PwTests builds on, put into every run's save -->
+    <KspTestCraft Include="../../saves/stock-sandbox/Ships/SPH/UITest_Plane.craft" />
+    <KspTestCraft Include="../../saves/stock-far/Ships/SPH/Stearwing A300*.craft" />
+    <!-- the save template SetupTests.Save_Template starts from -->
+    <KspTestSave Include="../../saves/stock-new" />
+    <None Include="ksptest.json" Condition="Exists('ksptest.json')" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- KspTest.Xunit, the runner and the harness, from this checkout as a consumer's submodule gives them -->
+  <Import Project="../../build/KspTest.FromSource.targets" />
+
+</Project>

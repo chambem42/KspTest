@@ -12,4 +12,8 @@ src/*/bin/
 src/*/obj/
 tests/*/bin/
 tests/*/obj/
+tools/*/bin/
+tools/*/obj/
 GameData/*/Plugins/*.pdb
+linux-results/
+tests/KspTest.LocalMod/GameData/

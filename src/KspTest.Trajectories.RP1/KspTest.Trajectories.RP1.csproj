@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(MSBuildThisFileDirectory)../../build/KspPlugin.props" />
+  <PropertyGroup>
+    <RootNamespace>KspTest</RootNamespace>
+    <PackageId>KspTest.Trajectories.RP1</PackageId>
+    <Description>Trajectories' tests in RP-1 and RSS: entries from KCT reentry simulations flown on MechJeb's SmartASS. Needs MechJeb and RP-1.</Description>
+    <MechJebPath Condition="'$(MechJebPath)' == ''">$(KspGameData)/MechJeb2/Plugins</MechJebPath>
+    <OutputPath>$(MSBuildThisFileDirectory)../../GameData/KspTest/Plugins/</OutputPath>
+    <!-- compile-time only: the harness itself is deployed into GameData by ksptest, never copied with a test assembly -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="ref/net48/" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KspTest/KspTest.csproj" Private="false" />
+    <ProjectReference Include="../KspTest.Far/KspTest.Far.csproj" Private="false" />
+    <ProjectReference Include="../KspTest.MechJeb/KspTest.MechJeb.csproj" Private="false" />
+    <ProjectReference Include="../KspTest.RP1/KspTest.RP1.csproj" Private="false" />
+    <ProjectReference Include="../KspTest.Trajectories/KspTest.Trajectories.csproj" Private="false" />
+    <ProjectReference Include="../KspTest.Trajectories.MechJeb/KspTest.Trajectories.MechJeb.csproj" Private="false" />
+    <Reference Include="RP0" HintPath="$(KspGameData)/RP-1/Plugins/RP0.dll" Private="false" />
+    <Reference Include="ROUtils" HintPath="$(KspGameData)/ROUtils/Plugins/ROUtils.dll" Private="false" />
+    <Reference Include="MechJeb2" HintPath="$(MechJebPath)/MechJeb2.dll" Private="false" />
+  </ItemGroup>
+</Project>
