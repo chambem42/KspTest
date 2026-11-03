@@ -11,7 +11,8 @@ namespace KspTest
     /// screenshot's texture. Each behaviour goes between GUIUtility's internal BeginGUI and EndGUI, all of them inside
     /// GUI.BeginWindows/EndWindows (so GUI.Window windows draw) and GUIUtility.BeginContainer, which counts as being in
     /// OnGUI (as UIElements' IMGUIContainer does; without it every GUI call throws "only from inside OnGUI"). KspTest's own
-    /// behaviours go last, on top. Those OnGUIs run only for the shot: the rest of a batchmode run has none.
+    /// behaviours go last, on top. The runner also runs the pass once a frame (Pump), so the OnGUIs run as they would in a
+    /// rendered game.
     /// </summary>
     internal static class SnapGui
     {
@@ -27,17 +28,48 @@ namespace KspTest
         private static object guiState;
         private static bool resolved, usable;
 
+        // the behaviours with an OnGUI, found again at most twice a second (FindObjectsOfType is slow in a modded game)
+        private static readonly List<MonoBehaviour> found = new List<MonoBehaviour>();
+        private static float foundAt = float.NegativeInfinity;
+        private static int drawnFrame = -1;
+        private static RenderTexture pumpRt;
+
+        /// <summary>
+        /// The pass for the frame in -batchmode, so IMGUI windows work as in a rendered game: their OnGUI code runs, and
+        /// Imgui sees them and presses their buttons (RP-1's KCT windows, for one). Drawn into a texture nobody reads;
+        /// a frame with a screenshot has had its pass already.
+        /// </summary>
+        public static void Pump()
+        {
+            if (drawnFrame == Time.frameCount || !Resolve()) return;
+            if (pumpRt == null || pumpRt.width != Screen.width || pumpRt.height != Screen.height)
+            {
+                if (pumpRt != null) pumpRt.Release();
+                pumpRt = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32) { name = "KspTest.SnapGui.Pump" };
+            }
+            Draw(pumpRt);
+        }
+
         public static void Draw(RenderTexture rt)
         {
             if (!Resolve()) return;
-            var behaviours = new List<MonoBehaviour>();
-            var ours = new List<MonoBehaviour>();
-            foreach (var mb in UnityEngine.Object.FindObjectsOfType<MonoBehaviour>())
+            drawnFrame = Time.frameCount;
+            if (Time.realtimeSinceStartup - foundAt > 0.5f)
             {
-                if (mb == null || !mb.isActiveAndEnabled || OnGui(mb.GetType()) == null) continue;
-                (mb.GetType().Assembly.GetName().Name.StartsWith("KspTest") ? ours : behaviours).Add(mb);
+                foundAt = Time.realtimeSinceStartup;
+                found.Clear();
+                var ours = new List<MonoBehaviour>();
+                foreach (var mb in UnityEngine.Object.FindObjectsOfType<MonoBehaviour>())
+                {
+                    if (mb == null || OnGui(mb.GetType()) == null) continue;
+                    (mb.GetType().Assembly.GetName().Name.StartsWith("KspTest") ? ours : found).Add(mb);
+                }
+                found.AddRange(ours);
             }
-            behaviours.AddRange(ours);
+            var behaviours = new List<MonoBehaviour>(found.Count);
+            foreach (var mb in found)
+                if (mb != null && mb.isActiveAndEnabled)
+                    behaviours.Add(mb);
 
             RenderTexture prevRt = RenderTexture.active;
             Event prevEvent = Event.current;

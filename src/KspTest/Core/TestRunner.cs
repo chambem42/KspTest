@@ -98,6 +98,20 @@ namespace KspTest
             if (Instance != this || _started) return;
             _started = true;
             StartCoroutine(RunAll());
+            if (Application.isBatchMode)
+                StartCoroutine(GuiPump());
+        }
+
+        /// <summary>-batchmode sends no OnGUI events: the IMGUI pass, run by hand at each frame's end (SnapGui.Pump).</summary>
+        private IEnumerator GuiPump()
+        {
+            var endOfFrame = new WaitForEndOfFrame();
+            while (true)
+            {
+                yield return endOfFrame;
+                try { SnapGui.Pump(); }
+                catch (Exception x) { Log.Warn("batchmode IMGUI pass: " + x.Message); }
+            }
         }
 
         private void Update()
