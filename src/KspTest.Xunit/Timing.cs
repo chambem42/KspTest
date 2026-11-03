@@ -45,9 +45,44 @@ namespace KspTest.Xunit
         public KspTestCase(IMessageSink diagnosticMessageSink, TestMethodDisplay defaultMethodDisplay, TestMethodDisplayOptions defaultMethodDisplayOptions,
             ITestMethod testMethod) : base(diagnosticMessageSink, defaultMethodDisplay, defaultMethodDisplayOptions, testMethod) { }
 
-        public override Task<RunSummary> RunAsync(IMessageSink diagnosticMessageSink, IMessageBus messageBus, object[] constructorArguments,
-            ExceptionAggregator aggregator, CancellationTokenSource cancellationTokenSource) =>
-            new Runner(this, DisplayName, SkipReason, constructorArguments, TestMethodArguments, messageBus, aggregator, cancellationTokenSource).RunAsync();
+        public override async Task<RunSummary> RunAsync(IMessageSink diagnosticMessageSink, IMessageBus messageBus, object[] constructorArguments,
+            ExceptionAggregator aggregator, CancellationTokenSource cancellationTokenSource)
+        {
+            var bus = new SkipBus(messageBus);
+            RunSummary summary = await new Runner(this, DisplayName, SkipReason, constructorArguments, TestMethodArguments, bus, aggregator,
+                cancellationTokenSource).RunAsync();
+            summary.Failed -= bus.Skipped;
+            summary.Skipped += bus.Skipped;
+            return summary;
+        }
+
+        /// <summary>
+        ///     xUnit 2 reports a test that threw <see cref="SkipException" /> as failed (its "$XunitDynamicSkip$" message is
+        ///     xUnit 3's convention): this bus turns that failure into a skip with the exception's reason.
+        /// </summary>
+        private sealed class SkipBus : IMessageBus
+        {
+            private static readonly string SkipType = typeof(SkipException).FullName!;
+            private readonly IMessageBus inner;
+            public int Skipped;
+
+            public SkipBus(IMessageBus inner) => this.inner = inner;
+
+            public bool QueueMessage(IMessageSinkMessage message)
+            {
+                if (message is ITestFailed failed && failed.ExceptionTypes.Length > 0 && failed.ExceptionTypes[0] == SkipType)
+                {
+                    Skipped++;
+                    string reason = failed.Messages[0] ?? "";
+                    int at = reason.IndexOf("$XunitDynamicSkip$", StringComparison.Ordinal);
+                    if (at >= 0) reason = reason.Substring(at + "$XunitDynamicSkip$".Length);
+                    return inner.QueueMessage(new TestSkipped(failed.Test, reason));
+                }
+                return inner.QueueMessage(message);
+            }
+
+            public void Dispose() { }   // the runner's bus outlives the test case
+        }
 
         private sealed class Runner : XunitTestCaseRunner
         {
