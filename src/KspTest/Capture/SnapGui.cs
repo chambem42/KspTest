@@ -46,11 +46,15 @@ namespace KspTest
             try
             {
                 GL.LoadPixelMatrix(0, rt.width, rt.height, 0);
-                Pass(EventType.Layout, behaviours);
-                Pass(EventType.Repaint, behaviours);
+                // the OnGUIs lay out for the screen; a shot bigger than the screen (Snap.ShotSize) scales them up
+                float scale = (float)rt.width / Screen.width;
+                Pass(EventType.Layout, behaviours, scale);
+                Pass(EventType.Repaint, behaviours, scale);
             }
             finally
             {
+                try { GUI.matrix = Matrix4x4.identity; }
+                catch (Exception x) { Log.Warn("batchmode IMGUI: resetting GUI.matrix: " + x.Message); }
                 GL.PopMatrix();
                 // batchmode has no current event until now, and the setter refuses null
                 Event.current = prevEvent ?? new Event { type = EventType.Ignore };
@@ -58,7 +62,7 @@ namespace KspTest
             }
         }
 
-        private static void Pass(EventType type, List<MonoBehaviour> behaviours)
+        private static void Pass(EventType type, List<MonoBehaviour> behaviours, float scale)
         {
             // off screen, so nothing is hovered
             var e = new Event { type = type, mousePosition = new Vector2(-10000, -10000) };
@@ -71,7 +75,7 @@ namespace KspTest
                 {
                     foreach (var mb in behaviours)
                         if (mb != null)
-                            Behaviour(mb, e, type);
+                            Behaviour(mb, e, type, scale);
                 }
                 finally
                 {
@@ -86,13 +90,16 @@ namespace KspTest
             }
         }
 
-        private static void Behaviour(MonoBehaviour mb, Event e, EventType type)
+        private static void Behaviour(MonoBehaviour mb, Event e, EventType type, float scale)
         {
             Event.current = e;
             e.type = type;   // a behaviour may have Used it
             beginGui(0, mb.GetInstanceID(), mb.useGUILayout ? 1 : 0);
             try
             {
+                // BeginGUI starts each behaviour at the identity (one that sets its own matrix replaces this)
+                if (scale != 1f)
+                    GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
                 OnGui(mb.GetType()).Invoke(mb, null);
             }
             catch (TargetInvocationException x) when (x.InnerException is ExitGUIException) { }

@@ -15,7 +15,7 @@ namespace KspTest.Xunit
     ///       "crafts": ["C:/my crafts"], "params": "crafts=My Plane+My Other Plane", "mods": ["Kopernicus"] }
     ///     </code>
     ///     KSPDIR, KSPTEST_RESULTS, KSPTEST_LOCK_FILE, KSPTEST_MUTE, KSPTEST_CRAFTS (paths, ";" separated),
-    ///     KSPTEST_PARAMS, KSPTEST_MODS.  Relative paths are from the test assembly.  crafts go into every run's save beside
+    ///     KSPTEST_PARAMS, KSPTEST_MODS, KSPTEST_WINDOW.  Relative paths are from the test assembly.  crafts go into every run's save beside
     ///     the test project's own (ksp-crafts/), and params override the tests' own: to fly the tests on your own vehicles.
     ///     With no install, the tests run in a KSP instance KspTest makes (<see cref="InstanceManager" />) with the
     ///     project's KspMod items (ksptest-mods.txt) and the settings' mods, plus the test's own ([KspFact(Mods)]): CKAN
@@ -40,6 +40,9 @@ namespace KspTest.Xunit
 
         /// <summary>Low-res textures outside screenshots ("textures", KSPTEST_TEXTURES): full, low or 0-3.</summary>
         public string? Textures;
+
+        /// <summary>The game's window, and so the screenshots' size ("window", KSPTEST_WINDOW): "1280x960"; 1920x1080 by default.</summary>
+        public string? Window;
 
         /// <summary>Crafts (files or folders) put into every run's save: the test project's ksp-crafts/, then the settings'.</summary>
         public List<string> Crafts = new List<string>();
@@ -92,6 +95,7 @@ namespace KspTest.Xunit
                 s.Params = Str(r, "params");
                 s.KspArgs = Str(r, "kspArgs");
                 s.Textures = Str(r, "textures");
+                s.Window = Str(r, "window");
                 if (r.TryGetProperty("mods", out JsonElement mods) && mods.ValueKind == JsonValueKind.Array)
                     foreach (JsonElement e in mods.EnumerateArray())
                         if (e.GetString() is string mod)
@@ -109,6 +113,7 @@ namespace KspTest.Xunit
             s.Params = Env("KSPTEST_PARAMS") ?? s.Params;
             s.KspArgs = Env("KSPTEST_KSP_ARGS") ?? s.KspArgs;
             s.Textures = Env("KSPTEST_TEXTURES") ?? s.Textures;
+            s.Window = Env("KSPTEST_WINDOW") ?? s.Window;
             s.Mods.AddRange(InstanceManager.Split(Env("KSPTEST_MODS")));
             // the project's KspMod and KspOverlay items, which the build wrote beside the tests
             s.Mods.InsertRange(0, Lines(Path.Combine(baseDir, "ksptest-mods.txt")));
@@ -138,6 +143,16 @@ namespace KspTest.Xunit
                         : new List<string>();
                 }
             return s;
+        }
+
+        /// <summary>"1280x960" as (1280, 960); null when not set.</summary>
+        internal static (int Width, int Height)? ParseWindow(string? window)
+        {
+            if (window == null) return null;
+            string[] p = window.ToLowerInvariant().Split('x');
+            if (p.Length == 2 && int.TryParse(p[0].Trim(), out int w) && int.TryParse(p[1].Trim(), out int h) && w > 0 && h > 0)
+                return (w, h);
+            throw new ArgumentException($"window \"{window}\" is not WIDTHxHEIGHT, such as 1280x960");
         }
 
         private static IEnumerable<string> Lines(string file) =>

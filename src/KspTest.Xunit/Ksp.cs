@@ -309,6 +309,11 @@ namespace KspTest.Xunit
                 TimeoutSec = s.TimeoutSec,
                 Scope = s.Tests.Keys.ToList(),
             }.WithParams(parameters).WithParams(s.Params);
+            if (KspSettings.ParseWindow(s.Window) is (int w, int h))
+            {
+                o.Width = w;
+                o.Height = h;
+            }
             o.Crafts.AddRange(s.Crafts);
             configure?.Invoke(o);
             return o;
