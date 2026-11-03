@@ -71,6 +71,12 @@ namespace KspTest
             {
                 Log.Warn("screenshot not written: " + path);
             }
+            // Back to the Update phase before the caller goes on. Resumed after WaitForEndOfFrame, a scene load started
+            // from here (KSP's synchronous FLIGHT -> FLIGHT revert) runs before the previous scene's deferred Destroys:
+            // the old flight UI is still there when the new one wakes, its StageManager destroys the new one as a
+            // usurper and then goes itself, and every later flight scene has no StageManager (a launch from an editor
+            // then throws in StageManager.BeginFlight and never starts).
+            yield return null;
         }
 
         /// <summary>
