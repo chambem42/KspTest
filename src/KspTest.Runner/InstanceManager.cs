@@ -51,6 +51,16 @@ namespace KspTest.Runner
 
             using (FileMutex.Acquire(Path.Combine(Root, name + ".lock"), $"another process making instance {name}", TimeSpan.FromHours(3), log))
             {
+                // an instance made before the names lost their "+": renamed, not made again
+                string legacy = Path.Combine(Root, Name(set, local, build, source, legacy: true));
+                if (legacy != dir && !Directory.Exists(dir) && InstanceInfo.Load(legacy) is InstanceInfo old && old.Ready)
+                {
+                    log($"instance {name}: renaming {Path.GetFileName(legacy)}");
+                    Directory.Move(legacy, dir);
+                    old.Name = name;
+                    old.Save(dir);
+                }
+
                 InstanceInfo? info = InstanceInfo.Load(dir);
                 if (info != null && info.Ready)
                 {
@@ -149,7 +159,7 @@ namespace KspTest.Runner
             return id != null ? File.ReadAllText(id).Trim() : "unknown";
         }
 
-        private static string Name(List<string> set, List<string> local, string build, KspInstall source)
+        private static string Name(List<string> set, List<string> local, string build, KspInstall source, bool legacy = false)
         {
             string dlc = string.Join(",", new[] { "SquadExpansion/MakingHistory", "SquadExpansion/Serenity" }
                 .Where(d => Directory.Exists(Path.Combine(source.GameData, d))));
@@ -158,14 +168,15 @@ namespace KspTest.Runner
                          string.Concat(local.Select(m => "\nlocal:" + m.ToLowerInvariant()));
             using var sha = SHA256.Create();
             string hash = string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(key)).Take(4).Select(b => b.ToString("x2")));
-            // as many whole mod names as fit, then how many more: FerramAerospaceResearchContinued+1-6e709356
+            // as many whole mod names as fit, then how many more: FerramAerospaceResearchContinued_1more-6e709356. Only
+            // letters, digits and _ . -: RP-1 refuses to start in a path with ' + or &
             string slug = set.Count + local.Count == 0 ? "stock" : "";
             List<string> names = set.Concat(local).Select(m => Regex.Replace(m.Split('=')[0], @"[^A-Za-z0-9_.-]", "_")).ToList();
             int shown = 0;
             while (shown < names.Count && (shown == 0 || slug.Length + 1 + names[shown].Length <= 40))
-                slug += (shown == 0 ? "" : "+") + names[shown++];
+                slug += (shown == 0 ? "" : legacy ? "+" : "_") + names[shown++];
             if (shown < names.Count)
-                slug += $"+{names.Count - shown}";
+                slug += legacy ? $"+{names.Count - shown}" : $"_{names.Count - shown}more";
             return $"{slug}-{hash}";
         }
     }
