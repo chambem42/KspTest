@@ -56,6 +56,39 @@ namespace KspTest.Runner
             Answer("001_ToolbarControl", "PluginData/ToolbarControl.cfg", "ToolbarControlData\r\n{\r\n\tshowWindowAtStartup = False\r\n}\r\n",
                 "Toolbar Controller's intro window: off");
             Answer("RP-1", "Plugins/PluginData/RP1MentionLoadingImages", "", "RP-1's loading images popup: don't show again");
+            // stock's own, where a game has no settings.cfg yet (a fresh CI game): What's New and the analytics (privacy)
+            // dialog, which sit over every screenshot until clicked. What's New also comes up, "don't show again" or not,
+            // for a version not in its list of those shown.
+            AnswerSetting("SHOW_WHATSNEW_DIALOG", "False", "KSP's What's New dialog: off");
+            if (GameVersion() is string version)
+                AnswerSetting("SHOW_WHATSNEW_DIALOG_VersionsShown", version, $"KSP's What's New dialog: {version}'s seen");
+            AnswerSetting("SHOW_ANALYTICS_DIALOG", "False", "KSP's analytics dialog: off");
+            AnswerSetting("SERENITY_SHOW_EXPANSION_INFO", "False", "KSP's Breaking Ground advert: off");
+            AnswerSetting("MISSION_SHOW_EXPANSION_INFO", "False", "KSP's Making History advert: off");
+        }
+
+        // "Version 1.12.5" near the top of the game's readme
+        private string? GameVersion()
+        {
+            string readme = Path.Combine(_install.Root, "readme.txt");
+            Match m = File.Exists(readme) ? Regex.Match(File.ReadAllText(readme), @"(?m)^Version (\d+\.\d+\.\d+)\s*$") : Match.Empty;
+            return m.Success ? m.Groups[1].Value : null;
+        }
+
+        private void AnswerSetting(string key, string value, string what)
+        {
+            if (File.Exists(_install.SettingsCfg) && Regex.IsMatch(File.ReadAllText(_install.SettingsCfg), $@"(?m)^{key}\s*="))
+                return;
+            AddSetting(key, value);
+            _log($"first-run question answered: {what}");
+        }
+
+        // KSP ignores the whole file, keeping its defaults, without a SETTINGS_FILE_VERSION (1.3.0 is 1.12's)
+        private void AddSetting(string key, string value)
+        {
+            if (!File.Exists(_install.SettingsCfg))
+                File.WriteAllText(_install.SettingsCfg, "SETTINGS_FILE_VERSION = 1.3.0\r\n");
+            File.AppendAllText(_install.SettingsCfg, $"{key} = {value}\r\n");
         }
 
         private void Answer(string mod, string file, string answer, string what)
@@ -79,17 +112,19 @@ namespace KspTest.Runner
         }
 
         // settings.cfg values changed for the run: KSP reads them at startup and writes the file back on exit, so the
-        // player's are put back once it has exited
+        // player's are put back once it has exited. A key the file does not have (or no file: a fresh game, which KSP
+        // fills in with its defaults on exit) is added and stays, there being no player's value to put back.
         private readonly Dictionary<string, string> _settingsWas = new Dictionary<string, string>();
 
         private void SetSetting(string key, string value)
         {
-            if (!File.Exists(_install.SettingsCfg))
-                return;
-            string text = File.ReadAllText(_install.SettingsCfg);
+            string text = File.Exists(_install.SettingsCfg) ? File.ReadAllText(_install.SettingsCfg) : "";
             Match m = Regex.Match(text, $@"(?m)^{key}\s*=[ \t]*(.*?)\s*$");
             if (!m.Success)
+            {
+                AddSetting(key, value);
                 return;
+            }
             if (!_settingsWas.ContainsKey(key))
                 _settingsWas[key] = m.Groups[1].Value;
             File.WriteAllText(_install.SettingsCfg, Regex.Replace(text, $@"(?m)^{key}\s*=[ \t]*.*?(?=\r?$)", $"{key} = {value}"));
