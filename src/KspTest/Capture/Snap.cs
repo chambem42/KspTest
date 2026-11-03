@@ -34,8 +34,16 @@ namespace KspTest
                 yield return new WaitForEndOfFrame();
                 if (Application.isBatchMode)
                 {
-                    try { RenderCameras(path); }
+                    RenderTexture rt = null;
+                    try
+                    {
+                        rt = RenderCameras();
+                        try { SnapGui.Draw(rt); }
+                        catch (System.Exception e) { Log.Warn("batchmode IMGUI failed: " + e); }
+                        Save(rt, path);
+                    }
                     catch (System.Exception e) { Log.Warn("batchmode screenshot failed: " + e.Message); }
+                    finally { if (rt != null) RenderTexture.ReleaseTemporary(rt); }
                 }
                 else
                 {
@@ -62,10 +70,10 @@ namespace KspTest
         /// <summary>
         /// A screenshot without a screen: -batchmode never draws a frame to the window, so CaptureScreenshot gets nothing
         /// (or black), but the graphics device is still there. Renders every enabled camera that draws to the screen, in
-        /// depth order as Unity would, into one texture and saves it. KSP's uGUI draws through its UI camera, so it is in
-        /// the shot; IMGUI windows (OnGUI) are not.
+        /// depth order as Unity would, into one texture (KSP's uGUI draws through its UI camera, so it is in the shot), for
+        /// SnapGui to draw the IMGUI over.
         /// </summary>
-        private static void RenderCameras(string path)
+        private static RenderTexture RenderCameras()
         {
             int w = Screen.width, h = Screen.height;
             var cams = new System.Collections.Generic.List<Camera>();
@@ -75,7 +83,7 @@ namespace KspTest
             cams.Sort((a, b) => a.depth.CompareTo(b.depth));
 
             var rt = RenderTexture.GetTemporary(w, h, 24, RenderTextureFormat.ARGB32);
-            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+            rt.name = "KspTest.Snap";
             RenderTexture prev = RenderTexture.active;
             try
             {
@@ -87,15 +95,33 @@ namespace KspTest
                     try { c.Render(); }
                     finally { c.targetTexture = null; }
                 }
+            }
+            catch
+            {
+                RenderTexture.ReleaseTemporary(rt);
+                throw;
+            }
+            finally
+            {
+                RenderTexture.active = prev;
+            }
+            return rt;
+        }
+
+        private static void Save(RenderTexture rt, string path)
+        {
+            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+            RenderTexture prev = RenderTexture.active;
+            try
+            {
                 RenderTexture.active = rt;
-                tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
                 tex.Apply(false);
                 File.WriteAllBytes(path, tex.EncodeToPNG());
             }
             finally
             {
-                RenderTexture.active = prev;
-                RenderTexture.ReleaseTemporary(rt);
+                RenderTexture.active = prev == rt ? null : prev;
                 Object.Destroy(tex);
             }
         }
