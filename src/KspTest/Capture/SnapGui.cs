@@ -101,6 +101,7 @@ namespace KspTest
             var e = new Event { type = type, mousePosition = new Vector2(-10000, -10000) };
             Event.current = e;
             beginContainer.Invoke(null, new[] { guiState });
+            int clips = ClipCount();
             try
             {
                 beginWindows(0, 0);
@@ -115,6 +116,7 @@ namespace KspTest
                     Event.current = e;
                     e.type = type;
                     endWindows();
+                    PopClips(clips, "the windows");
                 }
             }
             finally
@@ -127,6 +129,7 @@ namespace KspTest
         {
             Event.current = e;
             e.type = type;   // a behaviour may have Used it
+            int clips = ClipCount();
             beginGui(0, mb.GetInstanceID(), mb.useGUILayout ? 1 : 0);
             try
             {
@@ -142,8 +145,34 @@ namespace KspTest
             {
                 try { endGui(1); }
                 catch (Exception x) { Log.Warn($"batchmode IMGUI: EndGUI after {mb.GetType().FullName}: {x.Message}"); }
+                PopClips(clips, mb.GetType().FullName);
             }
         }
+
+        /// <summary>
+        ///     GUIClip's depth, and back down to it. An OnGUI or window function that throws between pushing a clip and
+        ///     popping it (GUILayout's "Getting control N's position" mismatch inside a window, for one) leaves the clip on
+        ///     the stack. A rendered game clears the stack at the end of the frame; this pass is not one, so the clip would
+        ///     stay for the rest of the session and every later shot would draw inside it, offset by its position.
+        /// </summary>
+        private static int ClipCount() => clipCount?.Invoke() ?? 0;
+
+        private static void PopClips(int to, string after)
+        {
+            if (clipCount == null || clipPop == null) return;
+            int n = 0;
+            try
+            {
+                while (clipCount() > to && n < 64) { clipPop(); n++; }
+            }
+            catch (Exception x) { Log.Warn($"batchmode IMGUI: popping GUIClips after {after}: {x.Message}"); }
+            if (n > 0 && leakWarned.Add(after))
+                Log.Warn($"batchmode IMGUI: {after} left {n} GUIClip(s) pushed; popped");
+        }
+
+        private static readonly HashSet<string> leakWarned = new HashSet<string>();
+        private static Func<int> clipCount;
+        private static Action clipPop;
 
         private static MethodInfo OnGui(Type t)
         {
@@ -180,6 +209,16 @@ namespace KspTest
                 beginWindows = (Action<int, int>)Delegate.CreateDelegate(typeof(Action<int, int>), bw);
                 endWindows = (Action)Delegate.CreateDelegate(typeof(Action), ew);
                 guiState = Activator.CreateInstance(stateType, true);
+                // GUIClip.Internal_GetCount() and Internal_Pop(), also internal; without them a leaked clip stays
+                Type clip = typeof(GUIUtility).Assembly.GetType("UnityEngine.GUIClip");
+                var count = clip?.GetMethod("Internal_GetCount", flags, null, Type.EmptyTypes, null);
+                var pop = clip?.GetMethod("Internal_Pop", flags, null, Type.EmptyTypes, null);
+                if (count != null && pop != null)
+                {
+                    clipCount = (Func<int>)Delegate.CreateDelegate(typeof(Func<int>), count);
+                    clipPop = (Action)Delegate.CreateDelegate(typeof(Action), pop);
+                }
+                else Log.Warn("batchmode IMGUI: GUIClip's count and pop not found, a clip a GUI leaves pushed stays");
                 return usable = true;
             }
             catch (Exception x)
