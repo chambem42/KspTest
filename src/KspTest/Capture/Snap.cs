@@ -83,7 +83,8 @@ namespace KspTest
         /// A -batchmode shot's size. Batchmode's screen is not the run's window: on Linux it is 640x480 whatever the
         /// arguments, the display or SetResolution say, and on Windows no taller than the desktop. So the shot is the
         /// screen scaled up toward the run's size, keeping the screen's shape so the UI (laid out for the screen) is not
-        /// stretched: Linux's 640x480 in a 1280x960 run is drawn at twice the size.
+        /// stretched: Linux's 640x480 in a 1280x960 run is drawn at twice the size. The IMGUI is not scaled with it
+        /// (SnapGui): its windows, placed for the small screen, get the rest of the shot to show whole.
         /// </summary>
         private static (int w, int h, float scale) ShotSize()
         {
