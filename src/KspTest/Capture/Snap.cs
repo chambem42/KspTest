@@ -13,8 +13,18 @@ namespace KspTest
         private const int MaxPath = 259;
         private static bool loggedScale;
 
-        /// <summary>Also shoot every completed Wait.Until (off with -Params "waitShots=off").</summary>
-        public static bool WaitShots = true;
+        // The shots a test does not ask for. Off unless the run's params turn them on: they come at moments chosen by the
+        // driver, not the test, and mostly show the same scene again. A test shoots what it means to show (Shot); a
+        // failing test is shot when it fails, before its cleanup.
+
+        /// <summary>Also shoot every completed Wait.Until (-Params "waitShots=on").</summary>
+        public static bool WaitShots;
+
+        /// <summary>Also shoot before every IMGUI button click (-Params "clickShots=on").</summary>
+        public static bool ClickShots;
+
+        /// <summary>Also shoot a passing test at its end, after its cleanup (-Params "passShots=on").</summary>
+        public static bool PassShots;
 
         public static IEnumerator Shot(TestContext ctx, string name)
         {
@@ -163,14 +173,15 @@ namespace KspTest
         /// <summary>The shot Wait.Until takes when its condition comes true: named after what it waited for.</summary>
         public static IEnumerator WaitShot(string what)
         {
-            yield return AutoShot("wait-" + what);
+            if (WaitShots)
+                yield return AutoShot("wait-" + what);
         }
 
-        /// <summary>A shot the drivers take on their own (under the same switch as the wait shots), into the current test.</summary>
+        /// <summary>A shot the drivers take on their own (the caller checks its switch), into the current test.</summary>
         public static IEnumerator AutoShot(string name)
         {
             var ctx = TestRunner.Context;
-            if (ctx == null || !WaitShots) yield break;
+            if (ctx == null) yield break;
             if (string.IsNullOrEmpty(name)) name = "auto";
             if (name.Length > 70) name = name.Substring(0, 70);
             yield return Shot(ctx, name);

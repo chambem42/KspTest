@@ -285,7 +285,7 @@ namespace KspTest
             EnsurePatched();
             // The form as it stands when its button is pressed is the one picture worth keeping of it; the
             // fields being filled in are not, and the action itself runs inside the wait, so shoot before it.
-            if (p.Kind == Kind.Button) yield return Snap.AutoShot((p.Window ?? "form") + "-before-" + p.Label);
+            if (p.Kind == Kind.Button && Snap.ClickShots) yield return Snap.AutoShot((p.Window ?? "form") + "-before-" + p.Label);
             _pending = p;
             try
             {

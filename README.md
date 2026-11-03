@@ -162,9 +162,10 @@ scripts that still call them.
 
 Results land in `results/<timestamp>-<test>/`: `result.json` (status, steps, recorded values,
 screenshots), `harness.log`, `KSP.log`, `screenshots/<test>/NN-[s<k>-<scenario>-]<name>.png` (the test's
-own shots; `<window>-before-<button>` for each IMGUI form as it stands when its button is pressed;
-`wait-<what>` for waits on game state such as flight ready or an entry ending - not scene loads, delays or
-field edits; and `end-<status>` when the test ends; `waitShots=off` keeps only the test's own),
+own shots (`Snap.Shot`), and `fail`, `crash` or `timeout` as a test fails, before its cleanup runs; the params
+add the drivers' own: `clickShots=on` an IMGUI form as it stands when its button is pressed
+(`<window>-before-<button>`), `waitShots=on` each wait on game state such as flight ready or an entry ending
+(`wait-<what>`; not scene loads, delays or field edits), `passShots=on` a passing test's end (`end-pass`)),
 and on failure `diagnostics.txt` (what was on screen: open popups, clickable uGUI buttons, IMGUI windows
 with their labels/buttons/fields, input locks, log tail).
 

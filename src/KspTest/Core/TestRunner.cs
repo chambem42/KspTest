@@ -56,6 +56,7 @@ namespace KspTest
             public float EndedAt;
             public TestContext Ctx;
             public bool TimedOut;
+            public bool FailureShot;   // shot as it failed, before its cleanup
         }
 
         private static bool _ran;
@@ -266,12 +267,9 @@ namespace KspTest
             TestContext.ScenarioStatus = null;
             Context = result.Ctx = new TestContext(Config, info.Name);
             // outside the test's own error handling: a value ParamBool does not know warns instead of ending the run
-            try { Snap.WaitShots = Context.ParamBool("waitShots", true); }
-            catch (UITestFailure e)
-            {
-                Snap.WaitShots = true;
-                Log.Warn(e.Message + "; wait shots stay on");
-            }
+            Snap.WaitShots = ShotSwitch("waitShots");
+            Snap.ClickShots = ShotSwitch("clickShots");
+            Snap.PassShots = ShotSwitch("passShots");
             double timeout = TimeoutOf(info);
             _testDeadline = Time.realtimeSinceStartup + (float)timeout;
             Log.Info($"==== TEST {info.Name} (starts at {info.Attr.StartsAt}, timeout {timeout:F0}s) ====");
@@ -330,6 +328,42 @@ namespace KspTest
         /// Runs an enumerator (and any nested IEnumerators it yields) with exception capture and the
         /// per-test timeout. Calls done(null) on success, done(status) with result.Message set on failure.
         /// </summary>
+        // outside the test's own error handling: a value ParamBool does not know warns instead of ending the run
+        private static bool ShotSwitch(string name)
+        {
+            try { return Context.ParamBool(name, false); }
+            catch (UITestFailure e)
+            {
+                Log.Warn(e.Message + $"; {name} stay off");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// The failing test shot as it failed, before its finally blocks put things back (closed its windows, restored
+        /// its settings), so the picture is the state that failed. A shot that throws is logged, never the test's end.
+        /// </summary>
+        private static IEnumerator FailureShot(TestResult result, string status)
+        {
+            if (result.Ctx == null) yield break;
+            IEnumerator shot;
+            try { shot = Snap.Shot(result.Ctx, status); }
+            catch (Exception e) { Log.Warn("screenshot failed: " + e.Message); yield break; }
+            result.FailureShot = true;
+            var stack = new Stack<IEnumerator>();
+            stack.Push(shot);
+            while (stack.Count > 0)
+            {
+                bool moved;
+                try { moved = stack.Peek().MoveNext(); }
+                catch (Exception e) { Log.Warn("screenshot failed: " + e.Message); yield break; }
+                if (!moved) { stack.Pop(); continue; }
+                object cur = stack.Peek().Current;
+                if (cur is IEnumerator nested) { stack.Push(nested); continue; }
+                yield return cur;
+            }
+        }
+
         private IEnumerator Pump(IEnumerator root, TestResult result, Action<string> done)
         {
             var stack = new Stack<IEnumerator>();
@@ -338,6 +372,7 @@ namespace KspTest
             {
                 if (result.TimedOut)
                 {
+                    yield return FailureShot(result, "timeout");
                     DisposeAll(stack);
                     result.Message = $"timed out in scene {HighLogic.LoadedScene} at step '{LastStep(result)}'";
                     done("timeout");
@@ -350,6 +385,8 @@ namespace KspTest
                 catch (Exception e) { error = Unwrap(e); }
                 if (error != null)
                 {
+                    if (!(error is UITestSkipped))
+                        yield return FailureShot(result, error is UITestFailure ? "fail" : "crash");
                     DisposeAll(stack);   // runs finally blocks (drivers clear pending state there)
                     if (error is UITestSkipped)
                     {
@@ -399,9 +436,13 @@ namespace KspTest
 
             if (status != "skipped" && result.Ctx != null)
             {
-                IEnumerator shot = null;
-                try { shot = Snap.Shot(result.Ctx, "end-" + status); } catch (Exception e) { Log.Warn("screenshot failed: " + e.Message); }
-                if (shot != null) yield return shot;
+                // a failure is shot as it fails (Pump); one that ended elsewhere (a scene that never came) here
+                if (status == "pass" ? Snap.PassShots : !result.FailureShot)
+                {
+                    IEnumerator shot = null;
+                    try { shot = Snap.Shot(result.Ctx, "end-" + status); } catch (Exception e) { Log.Warn("screenshot failed: " + e.Message); }
+                    if (shot != null) yield return shot;
+                }
                 if (status != "pass") WriteDiagnostics(result);
             }
 
