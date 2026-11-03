@@ -62,6 +62,21 @@ namespace KspTest.Xunit
         /// <summary>A KSP session of its own, never shared with other tests that run alike (it leaves the game in a state others must not start from).</summary>
         public bool Isolated { get; set; }
 
+        /// <summary>
+        ///     Skipped unless asked for: KSPTEST_EXPLICIT "1" (every explicit test) or a ";" list with this one's method name
+        ///     ([UITest(Explicit = true)], for a test that is known to fail until a fix lands, or too long for every run).
+        /// </summary>
+        public bool Explicit { get; set; }
+
+        private bool ExplicitlyAsked()
+        {
+            string? asked = Environment.GetEnvironmentVariable("KSPTEST_EXPLICIT");
+            if (string.IsNullOrEmpty(asked)) return false;
+            if (asked == "1" || asked.Equals("all", StringComparison.OrdinalIgnoreCase)) return true;
+            string name = Test?.Substring(Test.LastIndexOf('.') + 1) ?? "";
+            return asked.Split(';', ',').Any(a => a.Trim().Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
         /// <summary>The test's "Kind" trait (Check, Measure, ...), as [Trait("Kind", ...)] would set it.</summary>
         public string? Kind { get; set; }
 
@@ -69,6 +84,8 @@ namespace KspTest.Xunit
         {
             get
             {
+                if (_skip == null && Explicit && !ExplicitlyAsked())
+                    return "explicit: runs only when asked for (KSPTEST_EXPLICIT=1, or its name)";
                 // in an instance, the harness skips a test whose mods are not there (what its instance has is only known later)
                 if (_skip != null || KspSettings.Current.Install == null)
                     return _skip;

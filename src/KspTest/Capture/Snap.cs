@@ -19,7 +19,12 @@ namespace KspTest
         public static IEnumerator Shot(TestContext ctx, string name)
         {
             ctx.ShotCount++;
-            string sub = Path.Combine("screenshots", Sanitize(ctx.TestName));
+            string folder = Sanitize(ctx.TestName);
+            // the test's folder gives way too, keeping room for a short file name, past Windows' 260 character limit
+            int folderRoom = MaxPath - Path.GetFullPath(Path.Combine(ctx.ResultsDir, "screenshots")).Length - 1 - 24;
+            if (folder.Length > folderRoom)
+                folder = folder.Substring(0, System.Math.Max(8, folderRoom));
+            string sub = Path.Combine("screenshots", folder);
             string scen = string.IsNullOrEmpty(ctx.ScenarioName) ? "" : $"s{ctx.ScenarioIndex}-{Sanitize(ctx.ScenarioName)}-";
             string stem = $"{ctx.ShotCount:D2}-{scen}{Sanitize(name)}";
             // Unity's screenshot cannot write past Windows' 260 character path limit: the name gives way

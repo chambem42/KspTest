@@ -166,6 +166,8 @@ namespace KspTest.Xunit.Generator
                         Add(args, "NewGame", t.Str("NewGame"));
                         if (t.Named.TryGetValue("Isolated", out object? isolated) && isolated is bool b && b)
                             args.Add("Isolated = true");
+                        if (t.Named.TryGetValue("Explicit", out object? explicitTest) && explicitTest is bool e && e)
+                            args.Add("Explicit = true");
                         sb.Append(inner).Append("[global::KspTest.Xunit.KspFact(").Append(string.Join(", ", args)).Append(")]\n");
                         sb.Append(inner).Append("public void ").Append(t.Method).Append("() => global::KspTest.Xunit.Ksp.Run(test: ")
                             .Append(Literal(t.Id)).Append(");\n");
