@@ -9,8 +9,20 @@ namespace KspTest
         public UITestFailure(string message, Exception inner) : base(message, inner) { }
     }
 
+    /// <summary>Thrown by a test that cannot run here (the machine lacks something it needs): reports "skipped".</summary>
+    public class UITestSkipped : Exception
+    {
+        public UITestSkipped(string message) : base(message) { }
+    }
+
     public static class Assert
     {
+        /// <summary>Skips the test (not a failure) unless the machine has what it needs.</summary>
+        public static void SkipUnless(bool cond, string reason)
+        {
+            if (!cond) throw new UITestSkipped(reason);
+        }
+
         public static void True(bool cond, string what)
         {
             if (!cond) throw new UITestFailure("Assert failed: " + what);

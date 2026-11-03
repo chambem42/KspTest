@@ -351,6 +351,12 @@ namespace KspTest
                 if (error != null)
                 {
                     DisposeAll(stack);   // runs finally blocks (drivers clear pending state there)
+                    if (error is UITestSkipped)
+                    {
+                        result.Message = error.Message;
+                        done("skipped");
+                        yield break;
+                    }
                     result.Message = $"{error.GetType().Name}: {error.Message}\n{error.StackTrace}";
                     done(error is UITestFailure ? "fail" : "crash");
                     yield break;
