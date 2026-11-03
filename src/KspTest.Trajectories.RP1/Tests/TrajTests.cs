@@ -1161,11 +1161,13 @@ namespace KspTest.Tests.Trajectories.RP1
                 double dps = ctx.ParamDouble("mjSmoothDps", double.NaN);
                 if (!double.IsNaN(dps))
                 {
+                    if (!MjCompat.HasSmoothControl)
+                        throw new UITestFailure("this MechJeb's SmartASS has no Smooth Control (a dev build's): leave out mjSmoothDps");
                     mjSa = Mj.Core.GetComputerModule<MuMech.MechJebModuleSmartASS>();
-                    mjSmoothWas = mjSa.smoothControl;
-                    mjDpsWas = mjSa.degreesPerSecond.Val;
-                    mjSa.smoothControl = true;
-                    mjSa.degreesPerSecond.Val = dps;
+                    mjSmoothWas = MjCompat.SmoothControl(mjSa);
+                    mjDpsWas = MjCompat.SmoothDegreesPerSecond(mjSa);
+                    MjCompat.SetSmoothControl(mjSa, true);
+                    MjCompat.SetSmoothDegreesPerSecond(mjSa, dps);
                     ctx.Record(k + "mjSmoothDps", dps);
                 }
                 double velKp = ctx.ParamDouble("mjVelKp", double.NaN);
@@ -1204,7 +1206,7 @@ namespace KspTest.Tests.Trajectories.RP1
                     ctx.Record(k + "videoFrames", VideoCapture.End());
                 }
                 if (mjSa != null)
-                    ctx.Record(k + "mjSmoothStillOn", mjSa.smoothControl);
+                    ctx.Record(k + "mjSmoothStillOn", MjCompat.SmoothControl(mjSa));
             }
             finally
             {
@@ -1212,8 +1214,8 @@ namespace KspTest.Tests.Trajectories.RP1
                     dm.ShowInFlight = true;
                 if (mjSa != null)
                 {
-                    mjSa.smoothControl = mjSmoothWas;
-                    mjSa.degreesPerSecond.Val = mjDpsWas;
+                    MjCompat.SetSmoothControl(mjSa, mjSmoothWas);
+                    MjCompat.SetSmoothDegreesPerSecond(mjSa, mjDpsWas);
                 }
                 if (mjVelKp != null && !double.IsNaN(mjVelKpWas))
                     mjVelKp.Val = mjVelKpWas;
