@@ -50,11 +50,11 @@ namespace KspTest.MechJeb
             csv.Append(string.Join(",", new[]
             {
                 (step++).ToString(inv), Time.frameCount.ToString(inv), (Time.realtimeSinceStartup - startReal).ToString("F3", inv),
-                Planetarium.GetUniversalTime().ToString("F3", inv), (core != null ? core.VesselState.Time : double.NaN).ToString("F3", inv),
+                Planetarium.GetUniversalTime().ToString("F3", inv), (core != null ? MjCompat.Time(core.VesselState) : double.NaN).ToString("F3", inv),
                 Time.fixedDeltaTime.ToString("F3", inv), Time.timeScale.ToString("F1", inv),
                 s.pitch.ToString("F3", inv), s.yaw.ToString("F3", inv), s.roll.ToString("F3", inv),
                 w.x.ToString("F4", inv), w.y.ToString("F4", inv), w.z.ToString("F4", inv),
-                rcs.ToString("F3", inv), (core != null ? core.Attitude.attitudeError : double.NaN).ToString("F3", inv),
+                rcs.ToString("F3", inv), (core != null ? MjCompat.AttitudeError(core.Attitude) : double.NaN).ToString("F3", inv),
                 (v.altitude / 1000).ToString("F3", inv), v.ActionGroups[KSPActionGroup.RCS] ? "1" : "0",
             })).Append('\n');
         }

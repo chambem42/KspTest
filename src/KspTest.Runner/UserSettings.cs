@@ -7,7 +7,8 @@ namespace KspTest.Runner
 {
     /// <summary>
     ///     This machine's settings for the KSP instances KspTest makes, shared by every project: %APPDATA%/KspTest/settings.json
-    ///     (KSPTEST_SETTINGS moves it), the environment over it (KSPTEST_GAME, KSPTEST_CKAN, KSPTEST_INSTANCES):
+    ///     (KSPTEST_SETTINGS moves it), the environment over it (KSPTEST_GAME, KSPTEST_CKAN, KSPTEST_INSTANCES,
+    ///     KSPTEST_CKAN_REPOS):
     ///     <code>
     ///     { "gameSource": "C:/Program Files (x86)/Steam/steamapps/common/Kerbal Space Program",
     ///       "ckan": "C:/tools/ckan.exe", "instances": "D:/KspTest/instances" }
@@ -26,6 +27,12 @@ namespace KspTest.Runner
         /// <summary>The folder the instances are made in.</summary>
         public string? Instances;
 
+        /// <summary>
+        ///     CKAN repositories new instances use besides CKAN's own, ";" separated: a name from CKAN's list of them
+        ///     ("MechJeb2-dev", for MechJeb's dev builds), or name=url (ckanRepos, KSPTEST_CKAN_REPOS).
+        /// </summary>
+        public string? CkanRepos;
+
         public static string FilePath =>
             Environment.GetEnvironmentVariable("KSPTEST_SETTINGS") is string p && p.Length > 0
                 ? p
@@ -41,6 +48,7 @@ namespace KspTest.Runner
             s.GameSource = Env("KSPTEST_GAME") ?? s.GameSource;
             s.Ckan = Env("KSPTEST_CKAN") ?? s.Ckan;
             s.Instances = Env("KSPTEST_INSTANCES") ?? s.Instances;
+            s.CkanRepos = Env("KSPTEST_CKAN_REPOS") ?? s.CkanRepos;
             return s;
         }
 
@@ -58,6 +66,7 @@ namespace KspTest.Runner
             s.GameSource = Str(doc.RootElement, "gameSource");
             s.Ckan = Str(doc.RootElement, "ckan");
             s.Instances = Str(doc.RootElement, "instances");
+            s.CkanRepos = Str(doc.RootElement, "ckanRepos");
             return s;
         }
 
@@ -74,6 +83,8 @@ namespace KspTest.Runner
                     w.WriteString("ckan", Ckan);
                 if (Instances != null)
                     w.WriteString("instances", Instances);
+                if (CkanRepos != null)
+                    w.WriteString("ckanRepos", CkanRepos);
                 w.WriteEndObject();
             }
 

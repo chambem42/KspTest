@@ -120,7 +120,7 @@ namespace KspTest.MechJeb
             if (autostage) core.Staging.Users.Add(User);   // the Autostage setter is a no-op when the flag was already set
             Log.Info($"ascent guidance engaged: {s.AscentType} alt={orbitAltitudeM:F0} m inc={inclinationDeg} autostage={autostage} status='{ap.Status}'");
             var v = FlightGlobals.ActiveVessel;
-            if (stageToLaunch && (v.situation == Vessel.Situations.PRELAUNCH || v.Landed) && core.VesselState.ThrustAvailable < 0.001)
+            if (stageToLaunch && (v.situation == Vessel.Situations.PRELAUNCH || v.Landed) && MjCompat.ThrustAvailable(core.VesselState) < 0.001)
             {
                 Ctrl.SetThrottle(1f);
                 Ctrl.Stage();

@@ -81,6 +81,8 @@ namespace KspTest.Runner
                         if (_settings.Ckan == null)
                             throw new InvalidOperationException("no CKAN to install the mods with: " + Setup.Hint);
                         var ckan = new Ckan(_settings.Ckan);
+                        foreach (string repo in Split(_settings.CkanRepos))
+                            ckan.AddRepo(dir, repo, log);
                         ckan.Update(dir, log);
                         ckan.Install(dir, set, log);
                         info.Installed = ckan.Installed(dir);

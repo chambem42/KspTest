@@ -240,7 +240,7 @@ namespace KspTest.MechJeb
             MechJebCore core = v.GetMasterMechJeb();
             double dt = UnityEngine.Time.fixedDeltaTime;
             // MechJeb's error only while SmartASS is holding; the nose's angle off orbital prograde always
-            double err = core != null && core.Attitude.Enabled ? core.Attitude.attitudeError : double.NaN;
+            double err = core != null && core.Attitude.Enabled ? MjCompat.AttitudeError(core.Attitude) : double.NaN;
             double prog = Vector3d.Angle(v.ReferenceTransform.up, v.obt_velocity);
             ProgInt += prog * dt;
             ProgMax = Math.Max(ProgMax, prog);

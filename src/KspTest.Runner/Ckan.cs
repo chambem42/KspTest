@@ -25,6 +25,15 @@ namespace KspTest.Runner
                 throw new FileNotFoundException($"no CKAN at {Exe}");
         }
 
+        /// <summary>Adds a repository to the game folder's: a name from CKAN's list of them, or "name=url".</summary>
+        public void AddRepo(string gameDir, string repo, Action<string> log)
+        {
+            var args = new List<string> { "repo", "add", "--gamedir", gameDir, "--headless" };
+            int eq = repo.IndexOf('=');
+            args.AddRange(eq < 0 ? new[] { repo.Trim() } : new[] { repo.Substring(0, eq).Trim(), repo.Substring(eq + 1).Trim() });
+            Check(Run(log, args.ToArray()), "repo add " + repo);
+        }
+
         /// <summary>The module list, fresh from CKAN's repositories.</summary>
         public void Update(string gameDir, Action<string> log) => Check(Run(log, "update", "--gamedir", gameDir, "--headless"), "update");
 

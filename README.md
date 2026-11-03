@@ -120,6 +120,8 @@ download the latest (`ckan`), and whether the instances go in the default folder
 or another (`instances`). `ksptest setup` asks on the console (from a checkout: `dotnet run --project
 src/KspTest.Tool -- setup`). `dotnet test` gives the tests no console to ask on, so until then they skip and say to run
 it. `KSPTEST_GAME`, `KSPTEST_CKAN` and `KSPTEST_INSTANCES` override the file, and `KSPTEST_SETTINGS` moves it.
+`ckanRepos` (`KSPTEST_CKAN_REPOS`), ";" separated, adds CKAN repositories to new instances: a name from CKAN's list of
+them, such as `MechJeb2-dev` for MechJeb's dev builds (`MechJeb2-dev` in the mods), or `name=url`.
 
 MechJeb2's `MechJebKspTest` and `MechJebKspTestRun`, and FAR's `KspTests/`, are worked examples.
 
