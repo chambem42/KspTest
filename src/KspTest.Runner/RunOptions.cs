@@ -87,6 +87,13 @@ namespace KspTest.Runner
         public string? KspArgs;
 
         /// <summary>
+        ///     Files in the install (paths relative to its root) copied into the run's results folder, under collected/, once
+        ///     KSP has exited: what a run leaves in the game, such as a coverage recorder's report, kept per run before the
+        ///     next run's deploy writes over the install.
+        /// </summary>
+        public List<string> Collect = new List<string>();
+
+        /// <summary>
         ///     Unity's masterTextureLimit the harness holds outside screenshots ("textures": full = 0, low = 3, or 0-3): each
         ///     step halves textures' resolution, so low takes ~6 GiB off an RP-1 instance. Screenshots switch to full.
         /// </summary>

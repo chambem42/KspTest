@@ -120,6 +120,20 @@ namespace KspTest.Runner
 
                 if (File.Exists(install.KspLog))
                     TryCopy(install.KspLog, Path.Combine(resultsDir, "KSP.log"));
+                if (proc == null || proc.HasExited)
+                    foreach (string rel in o.Collect)
+                    {
+                        string from = Path.Combine(install.Root, rel);
+                        if (!File.Exists(from))
+                        {
+                            log($"collect: no {rel} in the install");
+                            continue;
+                        }
+                        string to = Path.Combine(resultsDir, "collected", rel);
+                        Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+                        TryCopy(from, to);
+                        log($"collected {rel}");
+                    }
             }
 
             RunResult result = RunResult.Read(resultsDir, status);

@@ -325,6 +325,7 @@ namespace KspTest.Xunit
                 TextureLimit = RunOptions.ParseTextures(s.Textures),
                 TimeoutSec = s.TimeoutSec,
                 Scope = s.Tests.Keys.ToList(),
+                Collect = s.Collect.ToList(),
             }.WithParams(parameters).WithParams(s.Params);
             if (KspSettings.ParseWindow(s.Window) is (int w, int h))
             {

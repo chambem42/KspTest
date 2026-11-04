@@ -15,7 +15,7 @@ namespace KspTest.Xunit
     ///       "crafts": ["C:/my crafts"], "params": "crafts=My Plane+My Other Plane", "mods": ["Kopernicus"] }
     ///     </code>
     ///     KSPDIR, KSPTEST_RESULTS, KSPTEST_LOCK_FILE, KSPTEST_MUTE, KSPTEST_CRAFTS (paths, ";" separated),
-    ///     KSPTEST_PARAMS, KSPTEST_MODS, KSPTEST_WINDOW.  Relative paths are from the test assembly.  crafts go into every run's save beside
+    ///     KSPTEST_PARAMS, KSPTEST_MODS, KSPTEST_WINDOW, KSPTEST_COLLECT.  Relative paths are from the test assembly.  crafts go into every run's save beside
     ///     the test project's own (ksp-crafts/), and params override the tests' own: to fly the tests on your own vehicles.
     ///     With no install, the tests run in a KSP instance KspTest makes (<see cref="InstanceManager" />) with the
     ///     project's KspMod items (ksptest-mods.txt) and the settings' mods, plus the test's own ([KspFact(Mods)]): CKAN
@@ -60,6 +60,12 @@ namespace KspTest.Xunit
         /// <summary>"k=v;k=v" applied over every run's parameters.</summary>
         public string? Params;
 
+        /// <summary>
+        ///     Files in the install (relative to its root) each run copies into its results folder's collected/ once KSP has
+        ///     exited ("collect" in ksptest.json, KSPTEST_COLLECT ";"-separated): a coverage recorder's report, say.
+        /// </summary>
+        public List<string> Collect = new List<string>();
+
         /// <summary>The in-game test assemblies to deploy, by name (GameData/KspTest/Tests/&lt;name&gt;): ksp-plugins/&lt;name&gt;/*.dll by default.</summary>
         public Dictionary<string, List<string>> Tests = new Dictionary<string, List<string>>();
 
@@ -96,6 +102,10 @@ namespace KspTest.Xunit
                 s.KspArgs = Str(r, "kspArgs");
                 s.Textures = Str(r, "textures");
                 s.Window = Str(r, "window");
+                if (r.TryGetProperty("collect", out JsonElement col) && col.ValueKind == JsonValueKind.Array)
+                    foreach (JsonElement e in col.EnumerateArray())
+                        if (e.GetString() is string collected)
+                            s.Collect.Add(collected);
                 if (r.TryGetProperty("mods", out JsonElement mods) && mods.ValueKind == JsonValueKind.Array)
                     foreach (JsonElement e in mods.EnumerateArray())
                         if (e.GetString() is string mod)
@@ -114,6 +124,8 @@ namespace KspTest.Xunit
             s.KspArgs = Env("KSPTEST_KSP_ARGS") ?? s.KspArgs;
             s.Textures = Env("KSPTEST_TEXTURES") ?? s.Textures;
             s.Window = Env("KSPTEST_WINDOW") ?? s.Window;
+            if (Env("KSPTEST_COLLECT") is string collect)
+                s.Collect.AddRange(collect.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
             s.Mods.AddRange(InstanceManager.Split(Env("KSPTEST_MODS")));
             // the project's KspMod and KspOverlay items, which the build wrote beside the tests
             s.Mods.InsertRange(0, Lines(Path.Combine(baseDir, "ksptest-mods.txt")));
