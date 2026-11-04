@@ -78,7 +78,7 @@ namespace KspTest.Runner
             var tweaks = new InstallTweaks(install, log);
             DateTime runStarted = DateTime.Now;
             string runCfg = RunCfg(o, saveFolder, resultsDir);
-            Process? proc = null;
+            Process? proc = null, window = null;
             string status = "unknown";
             try
             {
@@ -96,6 +96,9 @@ namespace KspTest.Runner
                     File.WriteAllText(install.RunCfg, runCfg, Encoding.ASCII);
                     proc = Launch(install, o, resultsDir);
                     log($"KSP started (PID {proc.Id}); running {o.Test} ...");
+                    // -batchmode has no window: a taskbar entry for it (Windows, an interactive desktop)
+                    BatchWindow.Close(window);
+                    window = BatchWindow.Start(proc, install, o, label, resultsDir, log);
                     o.Progress?.Invoke($"KSP started (PID {proc.Id}), {names.Length} test(s); loading");
 
                     status = Watch(proc, install, o, resultsDir, attempt, log, Say, Loaded);
@@ -112,6 +115,9 @@ namespace KspTest.Runner
                 // KSP still runs)
                 if (proc != null && !o.Keep)
                     proc.WaitForExit(15000);
+                // the window closes itself with its KSP; a Keep KSP still running keeps its window
+                if (proc == null || proc.HasExited)
+                    BatchWindow.Close(window);
                 if (proc == null || proc.HasExited)
                 {
                     tweaks.RestoreSettings();

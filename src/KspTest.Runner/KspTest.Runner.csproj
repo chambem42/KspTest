@@ -59,6 +59,8 @@
     <None Include="@(HarnessFile)" Link="ksptest/gamedata/KspTest/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" Pack="false" Visible="false" />
     <None Include="build/KspTest.Runner.targets" Pack="true" PackagePath="build/;buildTransitive/" />
+    <!-- the taskbar window for a -batchmode KSP (BatchWindow.cs) -->
+    <EmbeddedResource Include="batch-window.ps1" LogicalName="KspTest.Runner.batch-window.ps1" />
   </ItemGroup>
 
   <!-- a published runner carries every module: packing from an install without MechJeb or RP-1 would leave one out -->
