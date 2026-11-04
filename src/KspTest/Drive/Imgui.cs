@@ -15,20 +15,23 @@ namespace KspTest
     /// rects - for Dump()/IsVisible() and (b) satisfy one queued action by forcing the control's return
     /// value when its label (and optionally window title) matches, exactly as if it had been clicked.
     /// Actions fire during the Layout pass so the following Repaint sees consistent state.
+    /// Textures drawn with GUI.DrawTextureWithTexCoords are recorded too (Images), and a synthetic mouse
+    /// (ImguiMouse.cs) points at and presses on what a window draws.
     /// </summary>
-    public static class Imgui
+    public static partial class Imgui
     {
-        public enum Kind { Button, Toggle, Select, TextField }
+        public enum Kind { Button, Toggle, Select, TextField, Image }
 
         public class Control
         {
             public Kind Kind;
-            public string Label;      // button/toggle/grid-cell/label text
+            public string Label;      // button/toggle/grid-cell/label text; image: the texture's name
             public string Preceding;  // text field: the label drawn just before it
             public string Text;       // text field: current text
             public bool Value;        // toggle: current state
             public Rect ScreenRect;
             public bool Enabled;
+            public Texture Texture;   // image: the texture drawn
         }
 
         public class WindowInfo
@@ -81,6 +84,8 @@ namespace KspTest
             Patch(AccessTools.Method(typeof(GUI), "Label", new[] { typeof(Rect), typeof(GUIContent), typeof(GUIStyle) }), null, "PostLabel");
             Patch(AccessTools.Method(typeof(GUI), "Window", new[] { typeof(int), typeof(Rect), typeof(GUI.WindowFunction), typeof(GUIContent), typeof(GUIStyle) }), null, "PostWindow");
             Patch(AccessTools.Method(typeof(GUI), "CallWindowDelegate"), "PreCallWindow", "PostCallWindow");
+            Patch(AccessTools.Method(typeof(GUI), "DrawTextureWithTexCoords", new[] { typeof(Rect), typeof(Texture), typeof(Rect), typeof(bool) }), null, "PostTexture");
+            PatchMouse();
             if (!_registeredDiagnostics)
             {
                 TestRunner.DiagnosticsProviders.Add(Dump);
@@ -266,6 +271,16 @@ namespace KspTest
             catch (Exception e) { Log.Warn("Imgui.PostTextField: " + e.Message); }
         }
 
+        private static void PostTexture(Rect position, Texture image)
+        {
+            try
+            {
+                if (image != null)
+                    Record(new Control { Kind = Kind.Image, Label = image.name, Texture = image }, position);
+            }
+            catch { }
+        }
+
         private static void PostLabel(Rect position, GUIContent content)
         {
             try
@@ -401,6 +416,7 @@ namespace KspTest
                         case Kind.Toggle: sb.Append("    toggle   '").Append(Trunc(c.Label)).Append("' = ").Append(c.Value).Append('\n'); break;
                         case Kind.Select: sb.Append("    gridcell '").Append(Trunc(c.Label)).Append("'").Append(c.Value ? " (selected)" : "").Append('\n'); break;
                         case Kind.TextField: sb.Append("    text #").Append(c.Label).Append(" after '").Append(Trunc(c.Preceding)).Append("' = '").Append(Trunc(c.Text)).Append("'\n"); break;
+                        case Kind.Image: sb.Append("    image    '").Append(Trunc(c.Label)).Append($"' at {c.ScreenRect.x:F0},{c.ScreenRect.y:F0} {c.ScreenRect.width:F0}x{c.ScreenRect.height:F0}\n"); break;
                     }
                 }
             }
