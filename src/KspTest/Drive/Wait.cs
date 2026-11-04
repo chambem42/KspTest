@@ -9,6 +9,9 @@ namespace KspTest
     {
         public const double DefaultTimeout = 120;
 
+        /// <summary>How often a long wait logs that it is still waiting (well inside the runner's stall limit).</summary>
+        public const float StillWaitingSec = 60;
+
         /// <summary>What the harness is currently waiting for (shown on screen by the runner overlay).</summary>
         public static string Current { get; private set; }
         public static float CurrentSince { get; private set; }
@@ -18,12 +21,14 @@ namespace KspTest
         /// Waits for cond. With shot (the default) a screenshot is taken the moment it comes true, so pass
         /// shot: false for waits that only bridge to a state the next step photographs anyway (a scene load, a
         /// settling delay, a form field being set). detail (such as a dump of the window searched) is only built
-        /// on a timeout, and describes the state then.
+        /// on a timeout, and describes the state then. A long wait logs that it is still waiting every
+        /// <see cref="StillWaitingSec" />, so the runner does not take a quiet game for a frozen one.
         /// </summary>
         public static IEnumerator Until(Func<bool> cond, double timeoutSec, string what, bool shot = true, Func<string> detail = null)
         {
             float start = Time.realtimeSinceStartup;
             float deadline = start + (float)timeoutSec;
+            float nextNote = start + StillWaitingSec;
             Current = FirstLine(what);
             CurrentSince = start;
             CurrentTimeout = timeoutSec;
@@ -35,8 +40,15 @@ namespace KspTest
                     try { ok = cond(); }
                     catch (Exception e) { throw new UITestFailure($"condition '{what}' threw {e.GetType().Name}: {e.Message}", e); }
                     if (ok) break;
-                    if (Time.realtimeSinceStartup > deadline)
+                    float now = Time.realtimeSinceStartup;
+                    if (now > deadline)
                         throw new UITestFailure($"timeout after {timeoutSec:F0}s waiting for: {what}" + (detail != null ? "\n" + detail() : ""));
+                    if (now > nextNote)
+                    {
+                        Log.Info($"still waiting for: {FirstLine(what)} ({now - start:F0} of {timeoutSec:F0} s)");
+                        nextNote = now + StillWaitingSec;
+                    }
+
                     yield return null;
                 }
             }
