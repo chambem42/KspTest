@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -34,7 +35,10 @@ namespace KspTest.Runner
                     Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -STA -File \"{script}\"",
                 };
                 psi.Environment["KSPTEST_WINDOW_PID"] = ksp.Id.ToString();
-                psi.Environment["KSPTEST_WINDOW_TITLE"] = "KSP (batch): " + label;
+                // the first test by its own name (the label is the results folder's, cut short at the namespace)
+                string[] names = RunOptions.TestNames(o.Test);
+                string title = names.Length == 0 ? label : names[0].Split('.').Last() + (names.Length > 1 ? $" +{names.Length - 1}" : "");
+                psi.Environment["KSPTEST_WINDOW_TITLE"] = "KSP (batch): " + title;
                 psi.Environment["KSPTEST_WINDOW_EXE"] = install.Executable;
                 psi.Environment["KSPTEST_WINDOW_INSTALL"] = install.Root;
                 psi.Environment["KSPTEST_WINDOW_HARNESS"] = Path.Combine(resultsDir, "harness.log");
