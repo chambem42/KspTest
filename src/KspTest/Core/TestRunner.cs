@@ -84,6 +84,10 @@ namespace KspTest
             Log.Open(Config.ResultsDir);
             NewGameIntro.Suppress();
             Textures.Init(Config.TextureLimit);   // before the loader reads any texture
+            if (Config.TimeoutScale > 0)
+                Wait.TimeoutScale = Config.TimeoutScale;
+            if (Wait.TimeoutScale != 1)
+                Log.Info($"timeouts stretched x{Wait.TimeoutScale} (a run known to be slow)");
             Log.Info($"BEGIN tests='{Config.Test}' save='{Config.Save}' timeout={Config.TimeoutSec}s load={Config.LoadTimeoutSec}s results='{Config.ResultsDir}'");
             Log.Info($"KSP {Versioning.GetVersionStringFull()} root='{KSPUtil.ApplicationRootPath}'");
             _startedAt = Time.realtimeSinceStartup;
@@ -322,7 +326,7 @@ namespace KspTest
         }
 
         /// <summary>A test's timeout: its [UITest]'s, else the run's.  The runner outside reads it from the TEST line.</summary>
-        private static double TimeoutOf(TestInfo info) => info.Attr.TimeoutSec > 0 ? info.Attr.TimeoutSec : Config.TimeoutSec;
+        private static double TimeoutOf(TestInfo info) => (info.Attr.TimeoutSec > 0 ? info.Attr.TimeoutSec : Config.TimeoutSec) * Wait.TimeoutScale;
 
         /// <summary>
         /// Runs an enumerator (and any nested IEnumerators it yields) with exception capture and the

@@ -105,6 +105,12 @@ namespace KspTest.Runner
         /// </summary>
         public int MaxKsps = 1;
 
+        /// <summary>
+        ///     The harness's waits and test timeouts stretched by this (run.cfg timeoutScale): for a run known to be slow, such
+        ///     as an instrumented build beside other KSPs, instead of every wait made long enough for it.  1: as written.
+        /// </summary>
+        public double TimeoutScale = 1;
+
         /// <summary>Once the tests start (KSP has loaded): a clone hands a ModuleManager cache it rebuilt to its master.</summary>
         public Action<KspInstall>? Loaded;
 
@@ -178,7 +184,7 @@ namespace KspTest.Runner
         }
 
         public string SessionKey() =>
-            string.Join("|", SaveTemplate, NewGame, SaveFolder, NoReset, Keep, Width, Height, Mute, GcDivisor, KspArgs, TextureLimit, MaxKsps, LoadStallSec, LoadTimeoutSec, LoadRetries,
+            string.Join("|", SaveTemplate, NewGame, SaveFolder, NoReset, Keep, Width, Height, Mute, GcDivisor, KspArgs, TextureLimit, MaxKsps, TimeoutScale, LoadStallSec, LoadTimeoutSec, LoadRetries,
                 RunStallSec, WaitForOtherKspSec, ResultsRoot, SaveBackupRoot, LockFile, string.Join(",", Crafts),
                 string.Join(";", Params.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase).Select(kv => kv.Key + "=" + kv.Value)));
     }

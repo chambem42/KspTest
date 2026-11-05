@@ -48,6 +48,8 @@ namespace KspTest
         public int Height;
         /// <summary>Unity's masterTextureLimit outside screenshots; 0: full textures.</summary>
         public int TextureLimit;
+        /// <summary>The waits' and test timeouts' stretch for a run known to be slow (Wait.TimeoutScale); 1: as written.</summary>
+        public double TimeoutScale = 1;
         public readonly Dictionary<string, string> Params = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public static RunConfig TryLoad()
@@ -74,6 +76,7 @@ namespace KspTest
             if (node.HasValue("width")) cfg.Width = int.Parse(node.GetValue("width"), CultureInfo.InvariantCulture);
             if (node.HasValue("height")) cfg.Height = int.Parse(node.GetValue("height"), CultureInfo.InvariantCulture);
             if (node.HasValue("textureLimit")) cfg.TextureLimit = int.Parse(node.GetValue("textureLimit"), CultureInfo.InvariantCulture);
+            if (node.HasValue("timeoutScale")) cfg.TimeoutScale = double.Parse(node.GetValue("timeoutScale"), CultureInfo.InvariantCulture);
 
             var p = node.GetNode("PARAMS");
             if (p != null)

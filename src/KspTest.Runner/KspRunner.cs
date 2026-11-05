@@ -160,6 +160,7 @@ namespace KspTest.Runner
             sb.Append($"    timeoutSec = {o.TimeoutSec}\r\n    loadTimeoutSec = {o.LoadTimeoutSec}\r\n    quitWhenDone = {(o.Keep ? "false" : "true")}\r\n");
             sb.Append($"    width = {o.Width}\r\n    height = {o.Height}\r\n");
             if (o.TextureLimit > 0) sb.Append($"    textureLimit = {o.TextureLimit}\r\n");
+            if (o.TimeoutScale > 0 && o.TimeoutScale != 1) sb.Append($"    timeoutScale = {o.TimeoutScale.ToString(CultureInfo.InvariantCulture)}\r\n");
             sb.Append("    PARAMS\r\n    {\r\n");
             foreach (var kv in o.Params)
                 sb.Append($"        {kv.Key} = {kv.Value}\r\n");

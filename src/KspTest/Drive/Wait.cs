@@ -12,6 +12,12 @@ namespace KspTest
         /// <summary>How often a long wait logs that it is still waiting (well inside the runner's stall limit).</summary>
         public const float StillWaitingSec = 60;
 
+        /// <summary>
+        ///     Every timeout stretched by this (run.cfg timeoutScale, KSPTEST_TIMEOUT_SCALE): a run known to be slow, such as
+        ///     an instrumented build beside other KSPs.  1: as written.
+        /// </summary>
+        public static double TimeoutScale = 1;
+
         /// <summary>What the harness is currently waiting for (shown on screen by the runner overlay).</summary>
         public static string Current { get; private set; }
         public static float CurrentSince { get; private set; }
@@ -26,6 +32,7 @@ namespace KspTest
         /// </summary>
         public static IEnumerator Until(Func<bool> cond, double timeoutSec, string what, bool shot = true, Func<string> detail = null)
         {
+            timeoutSec *= TimeoutScale;
             float start = Time.realtimeSinceStartup;
             float deadline = start + (float)timeoutSec;
             float nextNote = start + StillWaitingSec;
