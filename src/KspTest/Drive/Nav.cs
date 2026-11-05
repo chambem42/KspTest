@@ -112,6 +112,22 @@ namespace KspTest
             Log.Info("space center loaded (new game)");
         }
 
+        /// <summary>
+        /// Crew for the next craft: the editor fills a craft's seats from the available crew when it loads it, and
+        /// the crew of every vessel left in flight (ToSpaceCenter saves those not on a launch site) stays assigned, so
+        /// a session's later launches would go up uncrewed, without control. Hires until <paramref name="count"/> are available.
+        /// </summary>
+        public static void EnsureCrew(int count = 4)
+        {
+            KerbalRoster roster = HighLogic.CurrentGame?.CrewRoster;
+            if (roster == null) return;
+            int available = roster.Crew.Count(k => k.rosterStatus == ProtoCrewMember.RosterStatus.Available);
+            for (int i = available; i < count; i++)
+                roster.GetNewKerbal(ProtoCrewMember.KerbalType.Crew).rosterStatus = ProtoCrewMember.RosterStatus.Available;
+            if (available < count)
+                Log.Info($"hired {count - available} crew ({available} were available)");
+        }
+
         /// <summary>Space Center -> editor, optionally loading a craft (absolute path) on entry.</summary>
         public static IEnumerator EnterEditor(TestContext ctx, EditorFacility facility = EditorFacility.VAB, string craftAbsPath = null)
         {
@@ -121,6 +137,7 @@ namespace KspTest
             {
                 if (!File.Exists(craftAbsPath)) throw new UITestFailure("craft not found: " + craftAbsPath);
                 Log.Info($"entering {facility} with craft {craftAbsPath}");
+                EnsureCrew();
                 EditorDriver.StartAndLoadVessel(craftAbsPath, facility);
                 LoadedCraft = craftAbsPath;
                 LoadedFacility = facility;
@@ -146,6 +163,7 @@ namespace KspTest
             if (!Wait.IsEditorReady()) throw new UITestFailure("LoadCraft: editor is not ready");
             if (!File.Exists(craftAbsPath)) throw new UITestFailure("craft not found: " + craftAbsPath);
             Log.Info("loading craft " + craftAbsPath);
+            EnsureCrew();
             EditorLogic.LoadShipFromFile(craftAbsPath);
             LoadedCraft = craftAbsPath;
             yield return Wait.EditorReady(requireShip: true, timeoutSec: 120);
