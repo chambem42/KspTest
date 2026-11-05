@@ -45,8 +45,11 @@ namespace KspTest.Runner
         public static string PathFor(string master, string root, int n) =>
             Path.Combine(root, Path.GetFileName(Path.GetFullPath(master).TrimEnd('\\', '/')) + "@" + n);
 
-        /// <summary>Makes the clone if there is none (its executable is the last thing copied), then refreshes it.</summary>
-        public static KspInstall Ensure(string master, string clone, Action<string> log)
+        /// <summary>
+        ///     Makes the clone if there is none (its executable is the last thing copied), then refreshes it.  alsoPrivate:
+        ///     more GameData folders the clone has a copy of (<see cref="Refresh" />).
+        /// </summary>
+        public static KspInstall Ensure(string master, string clone, Action<string> log, IEnumerable<string>? alsoPrivate = null)
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 throw new PlatformNotSupportedException("thin clones are Windows only (junctions and hard links)");
@@ -59,7 +62,7 @@ namespace KspTest.Runner
             {
                 bool fresh = !dst.Exists;
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                Refresh(src, dst, log);
+                Refresh(src, dst, log, alsoPrivate);
                 if (fresh)
                 {
                     new InstanceInfo
@@ -76,12 +79,17 @@ namespace KspTest.Runner
         /// <summary>
         ///     The clone made to match the master as it is now: junctions for new folders (dangling ones removed), the private
         ///     folders and root files copied where the master's are newer, KSP_x64_Data relinked, the master's ModuleManager
-        ///     cache and PartDatabase.cfg taken when the master's cache is newer and differs.
+        ///     cache and PartDatabase.cfg taken when the master's cache is newer and differs.  alsoPrivate: GameData folders
+        ///     (relative to it, "Mod/Plugins") copied like <see cref="PrivateFolders" /> this time, such as the ones a run
+        ///     writes what it collects into (a coverage report beside the mod's assemblies): linked, every clone's KSP would
+        ///     write the master's.  A folder copied for an earlier run and private no more is linked again.
         /// </summary>
-        public static void Refresh(KspInstall master, KspInstall clone, Action<string> log)
+        public static void Refresh(KspInstall master, KspInstall clone, Action<string> log, IEnumerable<string>? alsoPrivate = null)
         {
             int linked = 0, copied = 0;
             string src = Root(master), dst = Root(clone);
+            string[] priv = PrivateFolders.Concat((alsoPrivate ?? Enumerable.Empty<string>()).Select(f => f.Replace('\\', '/').Trim('/')))
+                .Where(f => f.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
             foreach (string name in OwnRootFolders)
                 Directory.CreateDirectory(Path.Combine(dst, name));
@@ -119,14 +127,9 @@ namespace KspTest.Runner
             // GameData: a junction per mod, the private folders copied, the root files (ModuleManager's cache aside) copied
             string gd = Path.Combine(src, "GameData"), gdDst = Path.Combine(dst, "GameData");
             Directory.CreateDirectory(gdDst);
-            int[] counts = Tree(gd, gdDst, "");
+            int[] counts = Tree(gd, gdDst, "", priv, log);
             linked += counts[0];
             copied += counts[1];
-            foreach (string link in Directory.GetDirectories(gdDst).Where(d => IsJunction(d) && !Directory.Exists(Path.Combine(gd, Path.GetFileName(d)))))
-            {
-                Directory.Delete(link);   // a junction to a folder the master no longer has
-                log($"clone: {Path.GetFileName(link)} is gone from the master; unlinked");
-            }
 
             if (Newer(Path.Combine(gd, "ModuleManager.ConfigSHA"), Path.Combine(gdDst, "ModuleManager.ConfigSHA")))
             {
@@ -173,7 +176,7 @@ namespace KspTest.Runner
 
         // A folder of GameData (rel "" is GameData itself): its files copied, each subfolder a junction, copied whole when
         // private, or made real and gone through when a private folder is inside it.  Returns { linked, copied }.
-        private static int[] Tree(string src, string dst, string rel)
+        private static int[] Tree(string src, string dst, string rel, string[] priv, Action<string> log)
         {
             int linked = 0, copied = 0;
             foreach (string file in Directory.GetFiles(src))
@@ -188,23 +191,37 @@ namespace KspTest.Runner
             {
                 string sub = rel == "" ? Path.GetFileName(dir) : rel + "/" + Path.GetFileName(dir);
                 string to = Path.Combine(dst, Path.GetFileName(dir));
-                if (PrivateFolders.Any(p => p.Equals(sub, StringComparison.OrdinalIgnoreCase)))
+                if (priv.Any(p => p.Equals(sub, StringComparison.OrdinalIgnoreCase)))
                 {
                     copied += Mirror(dir, to);
                 }
-                else if (PrivateFolders.Any(p => p.StartsWith(sub + "/", StringComparison.OrdinalIgnoreCase)))
+                else if (priv.Any(p => p.StartsWith(sub + "/", StringComparison.OrdinalIgnoreCase)))
                 {
                     if (IsJunction(to))
                         Directory.Delete(to);
                     Directory.CreateDirectory(to);
-                    int[] c = Tree(dir, to, sub);
+                    int[] c = Tree(dir, to, sub, priv, log);
                     linked += c[0];
                     copied += c[1];
                 }
                 else
                 {
+                    if (Directory.Exists(to) && !IsJunction(to))
+                    {
+                        // a copy for an earlier run (alsoPrivate) that this one shares: the master's again (junctions inside it unlinked, not followed)
+                        StockBase.DeleteTree(to);
+                        log($"clone: GameData/{sub} is the master's again");
+                    }
                     linked += Link(to, dir);
                 }
+            }
+
+            // a junction to a folder the master no longer has, at every level gone through (inside a mod folder made real
+            // for a private one, too): one left dangling fails KSP's walk of GameData as it loads (FontLoader.FindFonts)
+            foreach (string link in Directory.GetDirectories(dst).Where(d => IsJunction(d) && !Directory.Exists(Path.Combine(src, Path.GetFileName(d)))))
+            {
+                Directory.Delete(link);
+                log($"clone: GameData/{(rel == "" ? "" : rel + "/")}{Path.GetFileName(link)} is gone from the master; unlinked");
             }
 
             return new[] { linked, copied };

@@ -266,7 +266,8 @@ namespace KspTest.Xunit
                     KspInstall master = install;
                     KspInstall copy;
                     lock (InstallLock)
-                        copy = ThinClone.Ensure(master.Root, ThinClone.PathFor(master.Root, Path.GetDirectoryName(master.Root.TrimEnd('\\', '/'))!, clone), batch.Log);
+                        copy = ThinClone.Ensure(master.Root, ThinClone.PathFor(master.Root, Path.GetDirectoryName(master.Root.TrimEnd('\\', '/'))!, clone), batch.Log,
+                            CollectFolders());
                     Say($"in {Path.GetFileName(copy.Root.TrimEnd('\\', '/'))}, beside up to {KspSettings.Current.MaxKsps - 1} other KSPs");
                     o.Install = copy.Root;
                     o.MaxKsps = KspSettings.Current.MaxKsps;
@@ -401,7 +402,7 @@ namespace KspTest.Xunit
                     string key = master.Root + "|" + string.Join(";", local.OrderBy(l => l, StringComparer.OrdinalIgnoreCase));
                     if (MastersDeployed.Add(key))
                         Deployer.LocalMods(master, KspSettings.Current.Overlays.Concat(local), o.Log);
-                    ThinClone.Refresh(master, i, o.Log);
+                    ThinClone.Refresh(master, i, o.Log, CollectFolders());
                     DeployTests(i, o.Log);
                 }
             };
@@ -412,6 +413,16 @@ namespace KspTest.Xunit
                 File.Copy(manifest, Path.Combine(r.ResultsDir, "ksp-instance.json"), true);
             return r;
         }
+
+        /// <summary>
+        ///     The GameData folders (relative to it) of the files each run collects (KspSettings.Collect): a clone's own, so
+        ///     each KSP writes its own (a coverage recorder's report beside the mod's assemblies), not the master's.
+        /// </summary>
+        private static List<string> CollectFolders() => KspSettings.Current.Collect
+            .Select(c => c.Replace('\\', '/').TrimStart('/'))
+            .Where(c => c.StartsWith("GameData/", StringComparison.OrdinalIgnoreCase))
+            .Select(c => Path.GetDirectoryName(c.Substring("GameData/".Length))?.Replace('\\', '/') ?? "")
+            .Where(d => d.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
         /// <summary>The clone numbers (1..KspSettings.MaxKsps) for the sessions of this process running side by side.</summary>
         private static class Clones
