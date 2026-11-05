@@ -41,6 +41,18 @@ namespace KspTest.Xunit
         /// </summary>
         public int MaxKsps = 1;
 
+        /// <summary>
+        ///     More results folders the shards' durations come from ("durationsFrom", KSPTEST_DURATIONS ";"-separated) besides
+        ///     the run's own: runs alike kept elsewhere, such as earlier coverage runs, whose tests take many times as long.
+        /// </summary>
+        public List<string> DurationsFrom = new List<string>();
+
+        /// <summary>
+        ///     The in-game waits and test timeouts stretched by this ("timeoutScale", KSPTEST_TIMEOUT_SCALE): for a run known
+        ///     to be slow, such as a coverage build with several KSPs at once.  1 (the default): as the tests have them.
+        /// </summary>
+        public double TimeoutScale = 1;
+
         /// <summary>More arguments for KSP ("kspArgs", KSPTEST_KSP_ARGS), such as "-batchmode".</summary>
         public string? KspArgs;
 
@@ -102,6 +114,12 @@ namespace KspTest.Xunit
                     s.TimeoutSec = t.GetInt32();
                 if (r.TryGetProperty("maxKsps", out JsonElement mk) && mk.ValueKind == JsonValueKind.Number)
                     s.MaxKsps = mk.GetInt32();
+                if (r.TryGetProperty("timeoutScale", out JsonElement ts) && ts.ValueKind == JsonValueKind.Number)
+                    s.TimeoutScale = ts.GetDouble();
+                if (r.TryGetProperty("durationsFrom", out JsonElement df) && df.ValueKind == JsonValueKind.Array)
+                    foreach (JsonElement e in df.EnumerateArray())
+                        if (e.GetString() is string dir)
+                            s.DurationsFrom.Add(dir);
                 if (r.TryGetProperty("crafts", out JsonElement c) && c.ValueKind == JsonValueKind.Array)
                     foreach (JsonElement e in c.EnumerateArray())
                         if (e.GetString() is string p)
@@ -135,6 +153,10 @@ namespace KspTest.Xunit
             if (int.TryParse(Env("KSPTEST_MAX_KSPS"), out int maxKsps))
                 s.MaxKsps = maxKsps;
             s.MaxKsps = Math.Max(1, s.MaxKsps);
+            if (double.TryParse(Env("KSPTEST_TIMEOUT_SCALE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double scale) && scale > 0)
+                s.TimeoutScale = scale;
+            if (Env("KSPTEST_DURATIONS") is string durations)
+                s.DurationsFrom.AddRange(durations.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
             if (Env("KSPTEST_COLLECT") is string collect)
                 s.Collect.AddRange(collect.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
             s.Mods.AddRange(InstanceManager.Split(Env("KSPTEST_MODS")));

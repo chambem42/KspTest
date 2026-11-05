@@ -262,7 +262,7 @@ namespace KspTest.Xunit
                 if (batch.SideBySide && instance)
                 {
                     // beside other sessions: in a thin clone of the instance of its own, holding one of the KSP slots
-                    clone = Clones.Take();
+                    clone = Clones.Take(batch.EstimateSec);
                     KspInstall master = install;
                     KspInstall copy;
                     lock (InstallLock)
@@ -349,6 +349,7 @@ namespace KspTest.Xunit
                 KspArgs = s.KspArgs,
                 TextureLimit = RunOptions.ParseTextures(s.Textures),
                 TimeoutSec = s.TimeoutSec,
+                TimeoutScale = s.TimeoutScale,
                 Scope = s.Tests.Keys.ToList(),
                 Collect = s.Collect.ToList(),
             }.WithParams(parameters).WithParams(s.Params);
@@ -424,21 +425,31 @@ namespace KspTest.Xunit
             .Select(c => Path.GetDirectoryName(c.Substring("GameData/".Length))?.Replace('\\', '/') ?? "")
             .Where(d => d.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-        /// <summary>The clone numbers (1..KspSettings.MaxKsps) for the sessions of this process running side by side.</summary>
+        /// <summary>
+        ///     The clone numbers (1..KspSettings.MaxKsps) for the sessions of this process running side by side, the longest
+        ///     waiting session (by its estimate) served first: the longest ones start early and the short ones fill in.
+        /// </summary>
         private static class Clones
         {
             private static readonly object Gate = new object();
             private static readonly SortedSet<int> Free = new SortedSet<int>(Enumerable.Range(1, KspSettings.Current.MaxKsps));
+            // waiting sessions, longest first (then first come)
+            private static readonly SortedSet<(double NegSec, long Seq)> Waiting = new SortedSet<(double, long)>();
+            private static long seq;
 
-            /// <summary>The lowest free one, waiting for one to be given back.</summary>
-            public static int Take()
+            /// <summary>The lowest free one once no longer session is waiting, waiting for one to be given back.</summary>
+            public static int Take(double estimateSec)
             {
                 lock (Gate)
                 {
-                    while (Free.Count == 0)
+                    var me = (-estimateSec, seq++);
+                    Waiting.Add(me);
+                    while (Free.Count == 0 || Waiting.Min != me)
                         Monitor.Wait(Gate);
+                    Waiting.Remove(me);
                     int n = Free.Min;
                     Free.Remove(n);
+                    Monitor.PulseAll(Gate);
                     return n;
                 }
             }

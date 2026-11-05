@@ -139,6 +139,8 @@ namespace KspTest.Xunit
             public int Shard = 1, Shards = 1;
             /// <summary>Planned to run beside other sessions, in a thin clone of its instance (KspSettings.MaxKsps above 1).</summary>
             public bool SideBySide;
+            /// <summary>Its tests' last durations added up (side by side): the longest waiting gets the next KSP slot.</summary>
+            public double EstimateSec;
             public Task? Session;
             /// <summary>Which tests skip is known (the install is), and which runs last.</summary>
             public bool Planned;
@@ -204,7 +206,9 @@ namespace KspTest.Xunit
             }
 
             int maxKsps = KspSettings.Current.MaxKsps;
-            Dictionary<string, double>? took = maxKsps > 1 ? Durations.Load(KspSettings.Current.Results) : null;
+            Dictionary<string, double>? took = maxKsps > 1
+                ? Durations.Load(new[] { KspSettings.Current.Results }.Concat(KspSettings.Current.DurationsFrom))
+                : null;
             var batches = new List<Batch>();
             lock (ByTest)
                 foreach (IGrouping<string, Request> g in planned.GroupBy(r => r.Key))
@@ -215,7 +219,11 @@ namespace KspTest.Xunit
                                  string.Join(", ", shards.Select(s => $"{s.Count} tests ~{s.Sum(r => took!.TryGetValue(r.Test, out double t) ? t : UnknownSec):F0} s")));
                     for (int i = 0; i < shards.Count; i++)
                     {
-                        var b = new Batch(shards[i].ToArray()) { Shard = i + 1, Shards = shards.Count, SideBySide = took != null };
+                        var b = new Batch(shards[i].ToArray())
+                        {
+                            Shard = i + 1, Shards = shards.Count, SideBySide = took != null,
+                            EstimateSec = took == null ? 0 : shards[i].Sum(r => took.TryGetValue(r.Test, out double t) ? t : UnknownSec),
+                        };
                         batches.Add(b);
                         foreach (Request r in shards[i])
                             ByTest[r.UniqueId] = b;
@@ -223,8 +231,9 @@ namespace KspTest.Xunit
                 }
 
             // side by side, every session starts now: each waits for a KSP slot, not for xUnit to reach its first test
+            // (the longest first, so they ask for a slot first)
             if (took != null)
-                foreach (Batch b in batches)
+                foreach (Batch b in batches.OrderByDescending(b => b.EstimateSec))
                     lock (b)
                         b.Session ??= Task.Run(() => Ksp.RunSession(b));
         }
@@ -260,19 +269,22 @@ namespace KspTest.Xunit
         }
     }
 
-    /// <summary>Each test's last recorded duration (by Namespace.Class.Method), from the result.json of the runs in the results folder.</summary>
+    /// <summary>
+    ///     Each test's last recorded duration (by Namespace.Class.Method), from the result.json of the runs in the results
+    ///     folders (the run's own, and KspSettings.DurationsFrom).
+    /// </summary>
     internal static class Durations
     {
         /// <summary>The newest runs looked at: enough to have every test of a suite, newest first.</summary>
         private const int Runs = 200;
 
-        public static Dictionary<string, double> Load(string resultsRoot)
+        public static Dictionary<string, double> Load(IEnumerable<string> resultsRoots)
         {
             var took = new Dictionary<string, double>(StringComparer.Ordinal);
-            if (!Directory.Exists(resultsRoot))
-                return took;
-            // results folders are named by when they were made (yyyyMMdd-HHmmss-...): newest first
-            foreach (string dir in Directory.GetDirectories(resultsRoot).OrderByDescending(Path.GetFileName, StringComparer.Ordinal).Take(Runs))
+            // results folders are named by when they were made (yyyyMMdd-HHmmss-...): newest first, whichever root they are in
+            IEnumerable<string> runs = resultsRoots.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase)
+                .SelectMany(Directory.GetDirectories).OrderByDescending(Path.GetFileName, StringComparer.Ordinal).Take(Runs);
+            foreach (string dir in runs)
             {
                 if (!File.Exists(Path.Combine(dir, "result.json")))
                     continue;
