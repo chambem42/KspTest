@@ -209,7 +209,12 @@ namespace KspTest
         {
             Event real = Event.current;
             if (real != null && real.type == EventType.Repaint)
-                _realMouse = GUIUtility.GUIToScreenPoint(real.mousePosition);
+            {
+                // some windows repaint with the mouse off at a sentinel far off screen: not where it is
+                Vector2 at = GUIUtility.GUIToScreenPoint(real.mousePosition);
+                if (at.x >= 0 && at.y >= 0 && at.x <= Screen.width && at.y <= Screen.height)
+                    _realMouse = at;
+            }
             if (real == null || _pointer == null || (real.type != EventType.Layout && real.type != EventType.Repaint))
             {
                 inner(id);
