@@ -135,6 +135,10 @@ namespace KspTest.Xunit
         internal sealed class Batch
         {
             public readonly List<Request> Requests = new List<Request>();
+            /// <summary>Which of its session's shards it is (1-based) and how many there are; 1 of 1 unsplit.</summary>
+            public int Shard = 1, Shards = 1;
+            /// <summary>Planned to run beside other sessions, in a thin clone of its instance (KspSettings.MaxKsps above 1).</summary>
+            public bool SideBySide;
             public Task? Session;
             /// <summary>Which tests skip is known (the install is), and which runs last.</summary>
             public bool Planned;
@@ -199,13 +203,92 @@ namespace KspTest.Xunit
                 }
             }
 
+            int maxKsps = KspSettings.Current.MaxKsps;
+            Dictionary<string, double>? took = maxKsps > 1 ? Durations.Load(KspSettings.Current.Results) : null;
+            var batches = new List<Batch>();
             lock (ByTest)
                 foreach (IGrouping<string, Request> g in planned.GroupBy(r => r.Key))
                 {
-                    var b = new Batch(g.ToArray());
-                    foreach (Request r in g)
-                        ByTest[r.UniqueId] = b;
+                    List<List<Request>> shards = took == null ? new List<List<Request>> { g.ToList() } : Split(g.ToList(), maxKsps, took);
+                    if (shards.Count > 1)
+                        Live.Say($"{g.Count()} tests that share a session split into {shards.Count} side by side, by their last durations: " +
+                                 string.Join(", ", shards.Select(s => $"{s.Count} tests ~{s.Sum(r => took!.TryGetValue(r.Test, out double t) ? t : UnknownSec):F0} s")));
+                    for (int i = 0; i < shards.Count; i++)
+                    {
+                        var b = new Batch(shards[i].ToArray()) { Shard = i + 1, Shards = shards.Count, SideBySide = took != null };
+                        batches.Add(b);
+                        foreach (Request r in shards[i])
+                            ByTest[r.UniqueId] = b;
+                    }
                 }
+
+            // side by side, every session starts now: each waits for a KSP slot, not for xUnit to reach its first test
+            if (took != null)
+                foreach (Batch b in batches)
+                    lock (b)
+                        b.Session ??= Task.Run(() => Ksp.RunSession(b));
+        }
+
+        /// <summary>A shard runs no shorter than this: shorter, its KSP's load is too much of it.</summary>
+        internal const double MinShardSec = 120;
+
+        /// <summary>What a test takes when no run of it is on record.</summary>
+        internal const double UnknownSec = 30;
+
+        /// <summary>
+        ///     A session's tests split into up to maxKsps shards, each a run of them in plan order (tests next to each other
+        ///     tend to start from the same scene), of about the same time by their last recorded durations.
+        /// </summary>
+        internal static List<List<Request>> Split(List<Request> tests, int maxKsps, IReadOnlyDictionary<string, double> took)
+        {
+            double[] sec = tests.Select(r => took.TryGetValue(r.Test, out double s) ? s : UnknownSec).ToArray();
+            double total = sec.Sum();
+            int n = Math.Max(1, Math.Min(Math.Min(maxKsps, tests.Count), (int)(total / MinShardSec)));
+            var shards = new List<List<Request>> { new List<Request>() };
+            double done = 0;
+            for (int i = 0; i < tests.Count; i++)
+            {
+                // a new shard once this one has its share, the test going where it leaves the shard nearer its share
+                double share = total * shards.Count / n;
+                if (shards.Count < n && shards[shards.Count - 1].Count > 0 && done + sec[i] / 2 > share)
+                    shards.Add(new List<Request>());
+                shards[shards.Count - 1].Add(tests[i]);
+                done += sec[i];
+            }
+
+            return shards;
+        }
+    }
+
+    /// <summary>Each test's last recorded duration (by Namespace.Class.Method), from the result.json of the runs in the results folder.</summary>
+    internal static class Durations
+    {
+        /// <summary>The newest runs looked at: enough to have every test of a suite, newest first.</summary>
+        private const int Runs = 200;
+
+        public static Dictionary<string, double> Load(string resultsRoot)
+        {
+            var took = new Dictionary<string, double>(StringComparer.Ordinal);
+            if (!Directory.Exists(resultsRoot))
+                return took;
+            // results folders are named by when they were made (yyyyMMdd-HHmmss-...): newest first
+            foreach (string dir in Directory.GetDirectories(resultsRoot).OrderByDescending(Path.GetFileName, StringComparer.Ordinal).Take(Runs))
+            {
+                if (!File.Exists(Path.Combine(dir, "result.json")))
+                    continue;
+                try
+                {
+                    foreach (TestResult t in RunResult.Read(dir, "unknown").Tests)
+                        if (t.DurationSec > 0 && (t.Status == "pass" || t.Status == "fail") && !took.ContainsKey(t.Id))
+                            took[t.Id] = t.DurationSec;
+                }
+                catch (Exception)
+                {
+                    // a result.json being written, or of an older harness: the next runs have it
+                }
+            }
+
+            return took;
         }
     }
 }

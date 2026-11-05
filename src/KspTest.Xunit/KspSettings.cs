@@ -35,6 +35,12 @@ namespace KspTest.Xunit
         /// <summary>A test's timeout when its [UITest] sets none.</summary>
         public int TimeoutSec = 900;
 
+        /// <summary>
+        ///     KSPs at once ("maxKsps", KSPTEST_MAX_KSPS): above 1, a long shared session is split into shards that run side
+        ///     by side, each in a thin clone of its instance (<see cref="Batching" />).  1 (the default) runs one at a time.
+        /// </summary>
+        public int MaxKsps = 1;
+
         /// <summary>More arguments for KSP ("kspArgs", KSPTEST_KSP_ARGS), such as "-batchmode".</summary>
         public string? KspArgs;
 
@@ -94,6 +100,8 @@ namespace KspTest.Xunit
                     s.LoadStallSec = l.GetInt32();
                 if (r.TryGetProperty("timeoutSec", out JsonElement t) && t.ValueKind == JsonValueKind.Number)
                     s.TimeoutSec = t.GetInt32();
+                if (r.TryGetProperty("maxKsps", out JsonElement mk) && mk.ValueKind == JsonValueKind.Number)
+                    s.MaxKsps = mk.GetInt32();
                 if (r.TryGetProperty("crafts", out JsonElement c) && c.ValueKind == JsonValueKind.Array)
                     foreach (JsonElement e in c.EnumerateArray())
                         if (e.GetString() is string p)
@@ -124,6 +132,9 @@ namespace KspTest.Xunit
             s.KspArgs = Env("KSPTEST_KSP_ARGS") ?? s.KspArgs;
             s.Textures = Env("KSPTEST_TEXTURES") ?? s.Textures;
             s.Window = Env("KSPTEST_WINDOW") ?? s.Window;
+            if (int.TryParse(Env("KSPTEST_MAX_KSPS"), out int maxKsps))
+                s.MaxKsps = maxKsps;
+            s.MaxKsps = Math.Max(1, s.MaxKsps);
             if (Env("KSPTEST_COLLECT") is string collect)
                 s.Collect.AddRange(collect.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
             s.Mods.AddRange(InstanceManager.Split(Env("KSPTEST_MODS")));

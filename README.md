@@ -87,9 +87,17 @@ A mod keeps its tests in two projects of its own; the mod itself never reference
 
    Settings come from `ksptest.json` beside the test assembly or the environment, which wins: `install` (`KSPDIR`),
    `results` (`KSPTEST_RESULTS`), `lockFile` (`KSPTEST_LOCK_FILE`), `mute`
-   (`KSPTEST_MUTE`), `textures` (`KSPTEST_TEXTURES`, see Low-res textures below), `crafts` (`KSPTEST_CRAFTS`, `;` separated: more crafts for every run) and `params`
-   (`KSPTEST_PARAMS`: parameters over the tests' own), so anyone can fly a mod's tests on their own crafts. With no
-   install configured, the tests run in a KSP instance KspTest makes (below).
+   (`KSPTEST_MUTE`), `textures` (`KSPTEST_TEXTURES`, see Low-res textures below), `crafts` (`KSPTEST_CRAFTS`, `;` separated: more crafts for every run), `maxKsps`
+   (`KSPTEST_MAX_KSPS`, below) and `params` (`KSPTEST_PARAMS`: parameters over the tests' own), so anyone can fly a
+   mod's tests on their own crafts. With no install configured, the tests run in a KSP instance KspTest makes (below).
+
+   `maxKsps` above 1 runs that many KSPs at once: each session of more than a couple of minutes is split into up to
+   that many shards, runs of its tests in plan order of about the same time by each test's last duration in the
+   results folder (30 s for one never run), and every session starts as soon as the tests are planned, each in a thin
+   clone of its instance (`<instance>@N`, below) holding a slot. The local mods go into the instance itself, once,
+   before the first clone's KSP starts (the clones' mod folders are its); each clone gets the harness in its own
+   GameData/KspTest. `dotnet test` reports each test as its shard's KSP finishes it. FAR's 65 tests: 17 minutes one
+   at a time, 7 with `KSPTEST_MAX_KSPS=3` (12 cores, 64 GB, an 8 GB GPU; each KSP ~3.7 GB).
 
 ### KSP instances
 

@@ -198,9 +198,11 @@ namespace KspTest.Xunit
         }
 
         /// <summary>A batch's KSP session, on a thread of its own: the install or instance, which tests can run there, and the run.</summary>
-        private static void RunSession(Batching.Batch batch)
+        internal static void RunSession(Batching.Batch batch)
         {
-            string tag = ShortName(batch.Requests[0].Test) + (batch.Requests.Count > 1 ? $"+{batch.Requests.Count - 1}" : "");
+            string tag = ShortName(batch.Requests[0].Test) + (batch.Requests.Count > 1 ? $"+{batch.Requests.Count - 1}" : "") +
+                         (batch.Shards > 1 ? $" [{batch.Shard}/{batch.Shards}]" : "");
+            int clone = 0;
             // progress by the session's first test (and how many more): a line about that test alone needs no prefix
             void Say(string line)
             {
@@ -211,13 +213,17 @@ namespace KspTest.Xunit
             try
             {
                 Batching.Request first = batch.Requests[0];
-                (KspInstall install, bool instance) = InstallFor(first.Ckan.Concat(first.Local), line =>
-                {
-                    if (line.StartsWith("instance "))
-                        Say(line);
-                    else
-                        batch.Log(line);
-                });
+                KspInstall install;
+                bool instance;
+                // sessions starting side by side: one makes the instance, the others find it made
+                lock (InstallLock)
+                    (install, instance) = InstallFor(first.Ckan.Concat(first.Local), line =>
+                    {
+                        if (line.StartsWith("instance "))
+                            Say(line);
+                        else
+                            batch.Log(line);
+                    });
                 foreach (Batching.Request q in batch.Requests)
                     if ((q.SkipReason = SkipReason(install, instance, q)) != null)
                         Say($"{ShortName(q.Test)}: skipped ({q.SkipReason})");
@@ -253,7 +259,23 @@ namespace KspTest.Xunit
                 };
                 if (runs.Count > 1)
                     batch.Log($"one KSP session for {runs.Count} tests: {o.Test}");
-                batch.Result = Session(o, install, instance, runs[0].Local);
+                if (batch.SideBySide && instance)
+                {
+                    // beside other sessions: in a thin clone of the instance of its own, holding one of the KSP slots
+                    clone = Clones.Take();
+                    KspInstall master = install;
+                    KspInstall copy;
+                    lock (InstallLock)
+                        copy = ThinClone.Ensure(master.Root, ThinClone.PathFor(master.Root, Path.GetDirectoryName(master.Root.TrimEnd('\\', '/'))!, clone), batch.Log);
+                    Say($"in {Path.GetFileName(copy.Root.TrimEnd('\\', '/'))}, beside up to {KspSettings.Current.MaxKsps - 1} other KSPs");
+                    o.Install = copy.Root;
+                    o.MaxKsps = KspSettings.Current.MaxKsps;
+                    batch.Result = CloneSession(o, master, copy, runs[0].Local);
+                }
+                else
+                {
+                    batch.Result = Session(o, install, instance, runs[0].Local);
+                }
                 Live.Say($"{tag}: KSP session {batch.Result.Status} ({batch.Result.DurationSec:F0} s)");
             }
             catch (Exception e)
@@ -263,6 +285,8 @@ namespace KspTest.Xunit
             }
             finally
             {
+                if (clone > 0)
+                    Clones.Give(clone);
                 lock (batch)
                 {
                     batch.Planned = true;
@@ -356,6 +380,68 @@ namespace KspTest.Xunit
             return r;
         }
 
+        private static readonly object InstallLock = new object();
+
+        // the instances (by root and local mods) this process has put its local mods into
+        private static readonly HashSet<string> MastersDeployed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        ///     One KSP run in a thin clone of an instance, holding a slot beside other KSPs.  The clone's mod folders are the
+        ///     instance's (junctions), so the local mods go into the instance itself, once for this process and before the
+        ///     first clone's KSP starts; with the slot held, the clone is brought up to date with the instance and gets the
+        ///     harness and tests in its own GameData/KspTest.  A ModuleManager cache the clone rebuilt goes back to the
+        ///     instance once it has loaded (<see cref="ThinClone.SyncBack" />).
+        /// </summary>
+        private static RunResult CloneSession(RunOptions o, KspInstall master, KspInstall clone, List<string> local)
+        {
+            o.Deploy = i =>
+            {
+                lock (DeployLock)
+                {
+                    string key = master.Root + "|" + string.Join(";", local.OrderBy(l => l, StringComparer.OrdinalIgnoreCase));
+                    if (MastersDeployed.Add(key))
+                        Deployer.LocalMods(master, KspSettings.Current.Overlays.Concat(local), o.Log);
+                    ThinClone.Refresh(master, i, o.Log);
+                    DeployTests(i, o.Log);
+                }
+            };
+            o.Loaded = i => ThinClone.SyncBack(i, master, o.Log);
+            RunResult r = KspRunner.Run(o);
+            string manifest = Path.Combine(master.Root, InstanceManager.ManifestName);
+            if (File.Exists(manifest) && Directory.Exists(r.ResultsDir))
+                File.Copy(manifest, Path.Combine(r.ResultsDir, "ksp-instance.json"), true);
+            return r;
+        }
+
+        /// <summary>The clone numbers (1..KspSettings.MaxKsps) for the sessions of this process running side by side.</summary>
+        private static class Clones
+        {
+            private static readonly object Gate = new object();
+            private static readonly SortedSet<int> Free = new SortedSet<int>(Enumerable.Range(1, KspSettings.Current.MaxKsps));
+
+            /// <summary>The lowest free one, waiting for one to be given back.</summary>
+            public static int Take()
+            {
+                lock (Gate)
+                {
+                    while (Free.Count == 0)
+                        Monitor.Wait(Gate);
+                    int n = Free.Min;
+                    Free.Remove(n);
+                    return n;
+                }
+            }
+
+            public static void Give(int n)
+            {
+                lock (Gate)
+                {
+                    Free.Add(n);
+                    Monitor.PulseAll(Gate);
+                }
+            }
+        }
+
         private static readonly ConcurrentDictionary<string, HashSet<string>> Assemblies = new ConcurrentDictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
         // [UITest(Requires)]'s tags for the assemblies they stand for (as KspTest.Env has them); another tag is an assembly's name
@@ -425,20 +511,26 @@ namespace KspTest.Xunit
             {
                 if (instance)
                     Deployer.LocalMods(install, KspSettings.Current.Overlays.Concat(local), log);
-                var tests = new List<KeyValuePair<string, List<string>>>();
-                foreach (KeyValuePair<string, List<string>> t in KspSettings.Current.Tests)
-                {
-                    string[] missing = KspSettings.Current.TestRequires.TryGetValue(t.Key, out List<string>? needs)
-                        ? Missing(install, string.Join(";", needs))
-                        : new string[0];
-                    if (missing.Length == 0)
-                        tests.Add(t);
-                    else
-                        log($"skip   {t.Key} (this install has no {string.Join(", ", missing)})");
-                }
-
-                Deployer.DeployRun(install, null, tests, log);
+                DeployTests(install, log);
             }
+        }
+
+        /// <summary>The harness and the project's in-game assemblies the install has the mods for (<see cref="Deployer.DeployRun" />).</summary>
+        private static void DeployTests(KspInstall install, Action<string> log)
+        {
+            var tests = new List<KeyValuePair<string, List<string>>>();
+            foreach (KeyValuePair<string, List<string>> t in KspSettings.Current.Tests)
+            {
+                string[] missing = KspSettings.Current.TestRequires.TryGetValue(t.Key, out List<string>? needs)
+                    ? Missing(install, string.Join(";", needs))
+                    : new string[0];
+                if (missing.Length == 0)
+                    tests.Add(t);
+                else
+                    log($"skip   {t.Key} (this install has no {string.Join(", ", missing)})");
+            }
+
+            Deployer.DeployRun(install, null, tests, log);
         }
     }
 
