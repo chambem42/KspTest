@@ -99,6 +99,14 @@ A mod keeps its tests in two projects of its own; the mod itself never reference
    GameData/KspTest. `dotnet test` reports each test as its shard's KSP finishes it. FAR's 65 tests: 17 minutes one
    at a time, 7 with `KSPTEST_MAX_KSPS=3` (12 cores, 64 GB, an 8 GB GPU; each KSP ~3.7 GB).
 
+   The durations can come from more results folders, `durationsFrom` (`KSPTEST_DURATIONS`, `;` separated), for runs
+   alike kept elsewhere: a coverage run's tests take many times as long, so they split by earlier coverage runs. The
+   longest session waiting gets the next slot. A file a run collects (`collect`) is written into a folder of the
+   clone's own, not the instance's (a coverage report beside a mod's assemblies), and is the instance's again in a run
+   that does not collect it. `timeoutScale` (`KSPTEST_TIMEOUT_SCALE`) stretches every in-game wait and test timeout for
+   a run known to be slow: FAR's coverage, three instrumented KSPs at once, takes 33 minutes with it at 2, where one
+   KSP took 63.
+
 ### KSP instances
 
 With no `install` configured, each test runs in a KSP instance with just the mods it needs, which KspTest makes the
