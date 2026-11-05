@@ -35,6 +35,7 @@ namespace KspTest
         private static Vector2? _pointer;
         private static PendingMouse _mouse;
         private static Vector2? _realMouse;   // the real mouse as IMGUI has it (screen GUI point), from the last Repaint
+        private static readonly HashSet<int> OffScreenSeen = new HashSet<int>();   // diag
 
         private static void PatchMouse()
         {
@@ -214,6 +215,9 @@ namespace KspTest
                 Vector2 at = GUIUtility.GUIToScreenPoint(real.mousePosition);
                 if (at.x >= 0 && at.y >= 0 && at.x <= Screen.width && at.y <= Screen.height)
                     _realMouse = at;
+                else if (OffScreenSeen.Add(id))
+                    Log.Warn($"Imgui mouse (diag): window '{Info(id).Title}' ({id}) repaints with the mouse at {at.x:F0},{at.y:F0} " +
+                             $"(local {real.mousePosition.x:F1},{real.mousePosition.y:F1}, matrix scale {GUI.matrix.lossyScale}, pointer {_pointer})");
             }
             if (real == null || _pointer == null || (real.type != EventType.Layout && real.type != EventType.Repaint))
             {
@@ -235,7 +239,7 @@ namespace KspTest
 
             Event.current = ev;
             if (inject && ev.type != m.Type)
-                Log.Warn($"Imgui mouse: window '{Info(id).Title}' ignores the {m.Type}: the real mouse is outside it (see OverRealMouse)");
+                Log.Warn($"Imgui mouse: window '{Info(id).Title}' ignores the {m.Type}: the real mouse is outside it (see OverRealMouse); diag: real event at {real.mousePosition.x:F1},{real.mousePosition.y:F1}, hotControl {GUIUtility.hotControl}, keyboard {GUIUtility.keyboardControl}, matrix scale {GUI.matrix.lossyScale}, window rect {Info(id).Rect}, sampled {_realMouse}");
             try
             {
                 inner(id);
