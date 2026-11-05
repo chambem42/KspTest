@@ -17,8 +17,8 @@ namespace KspTest
     ///
     /// IMGUI takes a press or release (not a drag) only inside clips that hold the real mouse: Unity keeps the real
     /// mouse position for its clips and reads a mouse event outside them as Ignore. In batchmode the real mouse is at the
-    /// screen's top left corner, so a window that is to take synthetic presses is placed over that corner (its rect at
-    /// 0, 0), and the control under the pointer must not sit in a scroll view or group of its own (they clip). A press
+    /// screen's top left corner, in a game window where the OS cursor was at its last mouse message, so a window that is to take synthetic
+    /// presses is placed over it (OverRealMouse), and the control under the pointer must not sit in a scroll view or group of its own (they clip). A press
     /// the window would ignore is logged as such. Input.mousePosition stays the real cursor's: code that reads it needs
     /// PointerFeeds.
     /// </summary>
@@ -34,6 +34,7 @@ namespace KspTest
 
         private static Vector2? _pointer;
         private static PendingMouse _mouse;
+        private static Vector2? _realMouse;   // the real mouse as IMGUI has it (screen GUI point), from the last Repaint
 
         private static void PatchMouse()
         {
@@ -49,6 +50,24 @@ namespace KspTest
         {
             EnsurePatched();
             _pointer = screen;
+        }
+
+        /// <summary>
+        /// Where a window of this size is to go to take synthetic presses: over the real mouse (IMGUI takes a press only
+        /// inside clips that hold it), as the windows' last Repaint saw it. That is the screen's top left in batchmode,
+        /// and in a game window that never had a mouse message; one that had one keeps where the OS cursor then was
+        /// (Input.mousePosition, the cursor now, is not it). Kept on screen; a window of no size yet (it lays itself
+        /// out) goes with its corner just above and left of the mouse.
+        /// </summary>
+        public static Rect OverRealMouse(float width, float height)
+        {
+            EnsurePatched();
+            Vector2 real = _realMouse ?? Vector2.zero;
+            float x = Mathf.Clamp(real.x - Mathf.Max(width / 2, 10), 0, Mathf.Max(0, Screen.width - width));
+            float y = Mathf.Clamp(real.y - Mathf.Max(height / 2, 10), 0, Mathf.Max(0, Screen.height - height));
+            Log.Info($"Imgui mouse: the real mouse at {real.x:F0},{real.y:F0}{(_realMouse == null ? " (not seen yet)" : "")}: " +
+                     $"a {width:F0}x{height:F0} window placed at {x:F0},{y:F0}");
+            return new Rect(x, y, width, height);
         }
 
         /// <summary>The synthetic mouse let go of: IMGUI sees the real cursor again. Call it in a test's finally.</summary>
@@ -181,7 +200,7 @@ namespace KspTest
 
         private static void PreCallWindowMouse(ref GUI.WindowFunction func)
         {
-            if (_pointer == null || func == null) return;
+            if (func == null) return;
             GUI.WindowFunction inner = func;
             func = id => MousePass(inner, id);
         }
@@ -189,6 +208,8 @@ namespace KspTest
         private static void MousePass(GUI.WindowFunction inner, int id)
         {
             Event real = Event.current;
+            if (real != null && real.type == EventType.Repaint)
+                _realMouse = GUIUtility.GUIToScreenPoint(real.mousePosition);
             if (real == null || _pointer == null || (real.type != EventType.Layout && real.type != EventType.Repaint))
             {
                 inner(id);
@@ -209,7 +230,7 @@ namespace KspTest
 
             Event.current = ev;
             if (inject && ev.type != m.Type)
-                Log.Warn($"Imgui mouse: window '{Info(id).Title}' ignores the {m.Type}: the real mouse is outside it (in batchmode, at the screen's top left)");
+                Log.Warn($"Imgui mouse: window '{Info(id).Title}' ignores the {m.Type}: the real mouse is outside it (see OverRealMouse)");
             try
             {
                 inner(id);

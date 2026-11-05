@@ -20,7 +20,7 @@ namespace KspTest
     /// </summary>
     public static partial class Imgui
     {
-        public enum Kind { Button, Toggle, Select, TextField, Image }
+        public enum Kind { Button, Toggle, Select, TextField, Image, Label }
 
         public class Control
         {
@@ -44,6 +44,8 @@ namespace KspTest
             public List<Control> Building = new List<Control>();
             public List<string> Labels = new List<string>();
             public List<string> BuildingLabels = new List<string>();
+            public List<Control> LabelControls = new List<Control>();          // labels and boxes with text, where drawn
+            public List<Control> BuildingLabelControls = new List<Control>();
         }
 
         private class Pending
@@ -67,6 +69,7 @@ namespace KspTest
         private static int _currentWindow = NoWindow;
         private static string _lastLabel;
         private static int _textFieldIndex;
+        private static int _buttonMatchIndex;   // enabled buttons matching the pending click so far in this window pass
         private static Pending _pending;
         private static bool _registeredDiagnostics;
 
@@ -82,6 +85,7 @@ namespace KspTest
             Patch(AccessTools.Method(typeof(GUI), "SelectionGrid", new[] { typeof(Rect), typeof(int), typeof(GUIContent[]), typeof(int), typeof(GUIStyle) }), null, "PostSelectionGrid");
             Patch(AccessTools.Method(typeof(GUI), "DoTextField", new[] { typeof(Rect), typeof(int), typeof(GUIContent), typeof(bool), typeof(int), typeof(GUIStyle), typeof(string), typeof(char) }), null, "PostTextField");
             Patch(AccessTools.Method(typeof(GUI), "Label", new[] { typeof(Rect), typeof(GUIContent), typeof(GUIStyle) }), null, "PostLabel");
+            Patch(AccessTools.Method(typeof(GUI), "Box", new[] { typeof(Rect), typeof(GUIContent), typeof(GUIStyle) }), null, "PostBox");
             Patch(AccessTools.Method(typeof(GUI), "Window", new[] { typeof(int), typeof(Rect), typeof(GUI.WindowFunction), typeof(GUIContent), typeof(GUIStyle) }), null, "PostWindow");
             Patch(AccessTools.Method(typeof(GUI), "CallWindowDelegate"), "PreCallWindow", "PostCallWindow");
             Patch(AccessTools.Method(typeof(GUI), "DrawTextureWithTexCoords", new[] { typeof(Rect), typeof(Texture), typeof(Rect), typeof(bool) }), null, "PostTexture");
@@ -121,11 +125,13 @@ namespace KspTest
             _currentWindow = id;
             _lastLabel = null;
             _textFieldIndex = 0;
+            _buttonMatchIndex = 0;
             if (Event.current.type == EventType.Repaint)
             {
                 var w = Info(id);
                 w.Building.Clear();
                 w.BuildingLabels.Clear();
+                w.BuildingLabelControls.Clear();
             }
         }
 
@@ -136,6 +142,7 @@ namespace KspTest
                 var w = Info(id);
                 var tmp = w.Controls; w.Controls = w.Building; w.Building = tmp;
                 var tl = w.Labels; w.Labels = w.BuildingLabels; w.BuildingLabels = tl;
+                var tc = w.LabelControls; w.LabelControls = w.BuildingLabelControls; w.BuildingLabelControls = tc;
                 w.LastSeen = Time.realtimeSinceStartup;
             }
             _currentWindow = NoWindow;
@@ -198,7 +205,8 @@ namespace KspTest
                 string label = content?.text ?? "";
                 Record(new Control { Kind = Kind.Button, Label = Ugui.Clean(label) }, position);
                 var p = _pending;
-                if (p != null && !p.Done && p.Kind == Kind.Button && IsLayout && GUI.enabled && WindowMatches(p) && LabelMatches(p, label))
+                if (p != null && !p.Done && p.Kind == Kind.Button && IsLayout && GUI.enabled && WindowMatches(p) && LabelMatches(p, label) &&
+                    (p.Nth < 0 || _buttonMatchIndex++ == p.Nth))
                 {
                     __result = true;
                     p.Done = true;
@@ -289,8 +297,43 @@ namespace KspTest
                 if (text.Length == 0) return;
                 _lastLabel = text;
                 if (IsRepaint) Info(_currentWindow).BuildingLabels.Add(text);
+                RecordLabel(text, position);
             }
             catch { }
+        }
+
+        // a box's text (a tooltip, say) is a label too, but not the one a text field after it is named by
+        private static void PostBox(Rect position, GUIContent content)
+        {
+            try
+            {
+                string text = Ugui.Clean(content?.text);
+                if (text.Length == 0) return;
+                if (IsRepaint) Info(_currentWindow).BuildingLabels.Add(text);
+                RecordLabel(text, position);
+            }
+            catch { }
+        }
+
+        private static void RecordLabel(string text, Rect position)
+        {
+            if (!IsRepaint) return;
+            Info(_currentWindow).BuildingLabelControls.Add(new Control { Kind = Kind.Label, Label = text, ScreenRect = ToScreen(position), Enabled = GUI.enabled });
+        }
+
+        /// <summary>Where a label (or a box's text) that contains (or equals) text was last drawn, on screen (null: not drawn).</summary>
+        public static Rect? LabelRect(string text, string window = null, bool exact = false)
+        {
+            foreach (WindowInfo w in VisibleWindows())
+            {
+                if (window != null && w.Title.IndexOf(window, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                foreach (Control c in w.LabelControls)
+                    if (exact ? string.Equals(c.Label, text, StringComparison.OrdinalIgnoreCase)
+                              : c.Label.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
+                        return c.ScreenRect;
+            }
+
+            return null;
         }
 
         // ---------------------------------------------------------------- public API
@@ -319,6 +362,13 @@ namespace KspTest
         {
             yield return Run(new Pending { Kind = Kind.Button, Label = label, Window = window, Exact = exact }, timeoutSec,
                 $"IMGUI button '{label}'" + (window != null ? $" in window '{window}'" : ""));
+        }
+
+        /// <summary>Clicks the nth (from 0) enabled button with this label in a window, as Click does the first.</summary>
+        public static IEnumerator ClickNth(string label, int n, string window, double timeoutSec = 15, bool exact = true)
+        {
+            yield return Run(new Pending { Kind = Kind.Button, Label = label, Window = window, Exact = exact, Nth = n }, timeoutSec,
+                $"IMGUI button '{label}' #{n} in window '{window}'");
         }
 
         /// <summary>Sets a GUI.Toggle / GUILayout.Toggle to the wanted state.</summary>
