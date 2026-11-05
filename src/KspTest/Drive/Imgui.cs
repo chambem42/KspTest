@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Text;
 using HarmonyLib;
 using UnityEngine;
@@ -20,7 +22,7 @@ namespace KspTest
     /// </summary>
     public static partial class Imgui
     {
-        public enum Kind { Button, Toggle, Select, TextField, Image, Label }
+        public enum Kind { Button, Toggle, Select, TextField, Image, Label, Slider }
 
         public class Control
         {
@@ -54,6 +56,7 @@ namespace KspTest
             public string Label;
             public string Window;
             public string Value;
+            public float Number;      // slider: the value wanted
             public bool Wanted;
             public int Nth = -1;
             public bool Exact;
@@ -70,6 +73,7 @@ namespace KspTest
         private static string _lastLabel;
         private static int _textFieldIndex;
         private static int _buttonMatchIndex;   // enabled buttons matching the pending click so far in this window pass
+        private static int _sliderIndex;
         private static Pending _pending;
         private static bool _registeredDiagnostics;
 
@@ -89,6 +93,7 @@ namespace KspTest
             Patch(AccessTools.Method(typeof(GUI), "Window", new[] { typeof(int), typeof(Rect), typeof(GUI.WindowFunction), typeof(GUIContent), typeof(GUIStyle) }), null, "PostWindow");
             Patch(AccessTools.Method(typeof(GUI), "CallWindowDelegate"), "PreCallWindow", "PostCallWindow");
             Patch(AccessTools.Method(typeof(GUI), "DrawTextureWithTexCoords", new[] { typeof(Rect), typeof(Texture), typeof(Rect), typeof(bool) }), null, "PostTexture");
+            PatchSlider();
             PatchMouse();
             if (!_registeredDiagnostics)
             {
@@ -126,6 +131,7 @@ namespace KspTest
             _lastLabel = null;
             _textFieldIndex = 0;
             _buttonMatchIndex = 0;
+            _sliderIndex = 0;
             if (Event.current.type == EventType.Repaint)
             {
                 var w = Info(id);
@@ -279,6 +285,49 @@ namespace KspTest
             catch (Exception e) { Log.Warn("Imgui.PostTextField: " + e.Message); }
         }
 
+        // GUI.Slider's full overload (the one HorizontalSlider and VerticalSlider end in) differs between Unity versions:
+        // the one with an id and the most parameters. A press on a slider needs the real mouse over it, so a slider is
+        // set as a toggle is, by its return value
+        private static void PatchSlider()
+        {
+            MethodInfo slider = typeof(GUI).GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+                                           .Where(m => m.Name == "Slider" && m.ReturnType == typeof(float) &&
+                                                       m.GetParameters().Any(a => a.Name == "id") &&
+                                                       m.GetParameters().Any(a => a.Name == "position") &&
+                                                       m.GetParameters().Any(a => a.Name == "value"))
+                                           .OrderByDescending(m => m.GetParameters().Length)
+                                           .FirstOrDefault();
+            if (slider == null)
+            {
+                Log.Warn("Imgui: GUI.Slider(..., id) not found: sliders cannot be set");
+                return;
+            }
+
+            _harmony.Patch(slider, postfix: new HarmonyMethod(typeof(Imgui), nameof(PostSlider)));
+        }
+
+        private static void PostSlider(ref float __result, Rect position, float value)
+        {
+            try
+            {
+                int index = _sliderIndex++;
+                Record(new Control { Kind = Kind.Slider, Label = index.ToString(), Preceding = _lastLabel, Text = value.ToString("R") }, position);
+                var p = _pending;
+                if (p != null && !p.Done && p.Kind == Kind.Slider && IsLayout && GUI.enabled && WindowMatches(p))
+                {
+                    bool match = p.Nth >= 0 ? index == p.Nth : (_lastLabel != null && LabelMatches(p, _lastLabel));
+                    if (match)
+                    {
+                        __result = p.Number;
+                        GUI.changed = true;
+                        p.Done = true;
+                        p.DoneDetail = $"slider #{index} after '{_lastLabel}' {value:G4} -> {p.Number:G4} in window '{Info(_currentWindow).Title}'";
+                    }
+                }
+            }
+            catch (Exception e) { Log.Warn("Imgui.PostSlider: " + e.Message); }
+        }
+
         private static void PostTexture(Rect position, Texture image)
         {
             try
@@ -392,6 +441,20 @@ namespace KspTest
                 $"IMGUI text field after label '{precedingLabel}'" + (window != null ? $" in window '{window}'" : ""));
         }
 
+        /// <summary>Moves the slider drawn after a label (containing text) to a value, as a drag to it would.</summary>
+        public static IEnumerator SetSliderAfterLabel(string precedingLabel, float value, string window = null, double timeoutSec = 15)
+        {
+            yield return Run(new Pending { Kind = Kind.Slider, Label = precedingLabel, Number = value, Window = window }, timeoutSec,
+                $"IMGUI slider after label '{precedingLabel}'" + (window != null ? $" in window '{window}'" : ""));
+        }
+
+        /// <summary>Moves the nth (0-based, in draw order) slider of a window to a value.</summary>
+        public static IEnumerator SetSliderNth(int n, float value, string window, double timeoutSec = 15)
+        {
+            yield return Run(new Pending { Kind = Kind.Slider, Nth = n, Number = value, Window = window }, timeoutSec,
+                $"IMGUI slider #{n} in window '{window}'");
+        }
+
         /// <summary>Types a value into the nth (0-based, in draw order) text field of a window.</summary>
         public static IEnumerator SetTextNth(int n, string value, string window, double timeoutSec = 15)
         {
@@ -467,6 +530,7 @@ namespace KspTest
                         case Kind.Select: sb.Append("    gridcell '").Append(Trunc(c.Label)).Append("'").Append(c.Value ? " (selected)" : "").Append('\n'); break;
                         case Kind.TextField: sb.Append("    text #").Append(c.Label).Append(" after '").Append(Trunc(c.Preceding)).Append("' = '").Append(Trunc(c.Text)).Append("'\n"); break;
                         case Kind.Image: sb.Append("    image    '").Append(Trunc(c.Label)).Append($"' at {c.ScreenRect.x:F0},{c.ScreenRect.y:F0} {c.ScreenRect.width:F0}x{c.ScreenRect.height:F0}\n"); break;
+                        case Kind.Slider: sb.Append("    slider #").Append(c.Label).Append(" after '").Append(Trunc(c.Preceding)).Append("' = ").Append(c.Text).Append('\n'); break;
                     }
                 }
             }
