@@ -15,12 +15,11 @@ namespace KspTest
     /// replaces one Repaint pass of the window under the pointer (the window draws nothing that frame), as a real one
     /// follows the Layout pass. Positions are screen GUI points (y down), as Control.ScreenRect.
     ///
-    /// IMGUI takes a press or release (not a drag) only inside clips that hold the real mouse: Unity keeps the real
-    /// mouse position for its clips and reads a mouse event outside them as Ignore. In batchmode the real mouse is at the
-    /// screen's top left corner, in a game window where the OS cursor was at its last mouse message, so a window that is to take synthetic
-    /// presses is placed over it (OverRealMouse), and the control under the pointer must not sit in a scroll view or group of its own (they clip). A press
-    /// the window would ignore is logged as such. Input.mousePosition stays the real cursor's: code that reads it needs
-    /// PointerFeeds.
+    /// IMGUI reads a mouse event outside the clips that hold its real mouse as Ignore, and places the event in each clip
+    /// from the real mouse, which a test cannot move (batchmode leaves it unset: the screen's top left, or garbage). So
+    /// for a press, drag or release the GUI is moved instead: GUI.matrix set, for that event, so the real mouse is over
+    /// the pointer (UnderRealMouse). That works in any window, and in its groups and scroll views. A press a window still
+    /// ignores is logged. Input.mousePosition stays the real cursor's: code that reads it needs PointerFeeds.
     /// </summary>
     public static partial class Imgui
     {
@@ -34,8 +33,6 @@ namespace KspTest
 
         private static Vector2? _pointer;
         private static PendingMouse _mouse;
-        private static Vector2? _realMouse;   // the real mouse as IMGUI has it (screen GUI point), from the last Repaint
-        private static readonly HashSet<int> OffScreenSeen = new HashSet<int>();   // diag
 
         private static void PatchMouse()
         {
@@ -51,24 +48,6 @@ namespace KspTest
         {
             EnsurePatched();
             _pointer = screen;
-        }
-
-        /// <summary>
-        /// Where a window of this size is to go to take synthetic presses: over the real mouse (IMGUI takes a press only
-        /// inside clips that hold it), as the windows' last Repaint saw it. That is the screen's top left in batchmode,
-        /// and in a game window that never had a mouse message; one that had one keeps where the OS cursor then was
-        /// (Input.mousePosition, the cursor now, is not it). Kept on screen; a window of no size yet (it lays itself
-        /// out) goes with its corner just above and left of the mouse.
-        /// </summary>
-        public static Rect OverRealMouse(float width, float height)
-        {
-            EnsurePatched();
-            Vector2 real = _realMouse ?? Vector2.zero;
-            float x = Mathf.Clamp(real.x - Mathf.Max(width / 2, 10), 0, Mathf.Max(0, Screen.width - width));
-            float y = Mathf.Clamp(real.y - Mathf.Max(height / 2, 10), 0, Mathf.Max(0, Screen.height - height));
-            Log.Info($"Imgui mouse: the real mouse at {real.x:F0},{real.y:F0}{(_realMouse == null ? " (not seen yet)" : "")}: " +
-                     $"a {width:F0}x{height:F0} window placed at {x:F0},{y:F0}");
-            return new Rect(x, y, width, height);
         }
 
         /// <summary>The synthetic mouse let go of: IMGUI sees the real cursor again. Call it in a test's finally.</summary>
@@ -201,7 +180,7 @@ namespace KspTest
 
         private static void PreCallWindowMouse(ref GUI.WindowFunction func)
         {
-            if (func == null) return;
+            if (func == null || _pointer == null) return;
             GUI.WindowFunction inner = func;
             func = id => MousePass(inner, id);
         }
@@ -209,16 +188,6 @@ namespace KspTest
         private static void MousePass(GUI.WindowFunction inner, int id)
         {
             Event real = Event.current;
-            if (real != null && real.type == EventType.Repaint)
-            {
-                // some windows repaint with the mouse off at a sentinel far off screen: not where it is
-                Vector2 at = GUIUtility.GUIToScreenPoint(real.mousePosition);
-                if (at.x >= 0 && at.y >= 0 && at.x <= Screen.width && at.y <= Screen.height)
-                    _realMouse = at;
-                else if (OffScreenSeen.Add(id))
-                    Log.Warn($"Imgui mouse (diag): window '{Info(id).Title}' ({id}) repaints with the mouse at {at.x:F0},{at.y:F0} " +
-                             $"(local {real.mousePosition.x:F1},{real.mousePosition.y:F1}, matrix scale {GUI.matrix.lossyScale}, pointer {_pointer})");
-            }
             if (real == null || _pointer == null || (real.type != EventType.Layout && real.type != EventType.Repaint))
             {
                 inner(id);
@@ -228,6 +197,9 @@ namespace KspTest
             PendingMouse m = _mouse;
             bool inject = m != null && m.Frame < 0 && real.type == EventType.Repaint && WindowUnder(id, m.Screen);
             var ev = new Event(real) { mousePosition = GUIUtility.ScreenToGUIPoint(inject ? m.Screen : _pointer.Value) };
+            Event.current = ev;
+            Matrix4x4 window = GUI.matrix;
+            bool moved = false;
             if (inject)
             {
                 m.Frame = Time.frameCount;
@@ -235,18 +207,79 @@ namespace KspTest
                 ev.button = m.Button;
                 ev.clickCount = 1;
                 ev.modifiers = EventModifiers.None;
+                moved = UnderRealMouse(window, m.Screen);
             }
 
-            Event.current = ev;
             if (inject && ev.type != m.Type)
-                Log.Warn($"Imgui mouse: window '{Info(id).Title}' ignores the {m.Type}: the real mouse is outside it (see OverRealMouse); diag: real event at {real.mousePosition.x:F1},{real.mousePosition.y:F1}, hotControl {GUIUtility.hotControl}, keyboard {GUIUtility.keyboardControl}, matrix scale {GUI.matrix.lossyScale}, window rect {Info(id).Rect}, sampled {_realMouse}");
+                Log.Warn($"Imgui mouse: window '{Info(id).Title}' ignores the {m.Type} at {m.Screen.x:F0},{m.Screen.y:F0}: the real mouse " +
+                         $"({AbsoluteMouse()?.ToString() ?? "unknown"}) is outside it{(moved ? "" : " and the GUI could not be moved under it")}");
             try
             {
                 inner(id);
             }
             finally
             {
+                if (moved) GUI.matrix = window;
                 Event.current = real;
+            }
+        }
+
+        private static MethodInfo _absoluteMouse;
+        private static bool _absoluteResolved;
+
+        /// <summary>IMGUI's real mouse (GUIClip.GetAbsoluteMousePosition, internal), in screen pixels.</summary>
+        private static Vector2? AbsoluteMouse()
+        {
+            if (!_absoluteResolved)
+            {
+                _absoluteResolved = true;
+                _absoluteMouse = typeof(GUI).Assembly.GetType("UnityEngine.GUIClip")?.GetMethod("GetAbsoluteMousePosition",
+                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public, null, Type.EmptyTypes, null);
+                if (_absoluteMouse == null) Log.Warn("Imgui mouse: no GUIClip.GetAbsoluteMousePosition in this Unity");
+            }
+
+            try
+            {
+                return _absoluteMouse == null ? (Vector2?)null : (Vector2)_absoluteMouse.Invoke(null, null);
+            }
+            catch (Exception x)
+            {
+                Log.Warn("Imgui mouse: reading the real mouse: " + (x.InnerException ?? x).Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// The GUI moved, for this event, so the real mouse is over a screen point: GUI.matrix set to the window's with a
+        /// transform taking the point to the real mouse. Unity then places the event, and tests it against every clip,
+        /// with the real mouse read back through it: at the point, in the window's coordinates and in its groups' and
+        /// scroll views'. Nothing draws in a mouse event. Along an axis the real mouse is far out on (batchmode leaves
+        /// it unset, and a process can start with garbage there) it is a scale, which keeps the precision a shift loses.
+        /// </summary>
+        private static bool UnderRealMouse(Matrix4x4 window, Vector2 screen)
+        {
+            Vector2? abs = AbsoluteMouse();
+            if (abs == null || float.IsNaN(abs.Value.x) || float.IsNaN(abs.Value.y) || float.IsInfinity(abs.Value.x) || float.IsInfinity(abs.Value.y))
+                return false;
+            Matrix4x4 s = Matrix4x4.identity;
+            for (int axis = 0; axis < 2; axis++)
+            {
+                float a = abs.Value[axis], p = screen[axis];
+                if (Mathf.Abs(a) > 1e6f && Mathf.Abs(p) >= 1)
+                    s[axis, axis] = a / p;
+                else
+                    s[axis, 3] = a - p;
+            }
+
+            try
+            {
+                GUI.matrix = s * window;
+                return true;
+            }
+            catch (Exception x)
+            {
+                Log.Warn("Imgui mouse: moving the GUI under the real mouse: " + (x.InnerException ?? x).Message);
+                return false;
             }
         }
 
