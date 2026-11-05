@@ -10,18 +10,19 @@ using System.Threading;
 namespace KspTest.Runner
 {
     /// <summary>
-    ///     One KSP at a time on this machine (two modded RSS games at once ran the GPU out of memory).  Every launcher shares a
-    ///     lock file: "pid=&lt;holder&gt; install=... test=... started=...".  A run waits while any KSP runs, from any install,
-    ///     or while another holds the lock, then holds it until its KSP is gone.  A lock whose pid is no longer running is
-    ///     stale and taken over; one written by hand without a pid counts as held for 12 hours.  A script that holds the lock
-    ///     over several runs passes it on by setting KSPTEST_LOCK_PID to its pid for the runs it starts.
+    ///     One test run's KSP at a time on this machine.  Every launcher shares a lock file: "pid=&lt;holder&gt; install=...
+    ///     test=... started=...".  A run waits while another holds the lock or while a KSP runs from the install it plays in,
+    ///     then holds it until its KSP is gone.  A KSP from another folder (someone's game) is not the run's business and
+    ///     does not hold it up.  A lock whose pid is no longer running is stale and taken over; one written by hand without a
+    ///     pid counts as held for 12 hours.  A script that holds the lock over several runs passes it on by setting
+    ///     KSPTEST_LOCK_PID to its pid for the runs it starts.
     ///
     ///     Runs allowing more KSPs at once (<see cref="AcquireSlot" />, each from an install of its own: thin clones) take a
     ///     slot instead, a file beside the lock named for the install ("&lt;lock&gt;.&lt;folder&gt;-&lt;hash&gt;", with a
     ///     "state=loading|loaded" the run moves on once its KSP has loaded).  A slot is taken when no one-KSP run holds the
-    ///     lock, no run plays in that install, fewer than the maximum are taken, no other slot's KSP is still loading (loads
-    ///     one at a time: a ModuleManager rebuild finished and handed on before the next clone loads) and every KSP running
-    ///     is a slot's.  A one-KSP run waits for every slot as for a lock.
+    ///     lock, no run plays in that install and no KSP runs from it, fewer than the maximum are taken and no other slot's
+    ///     KSP is still loading (loads one at a time: a ModuleManager rebuild finished and handed on before the next clone
+    ///     loads).  A one-KSP run waits for every slot as for a lock.
     /// </summary>
     public sealed class KspLock : IDisposable
     {
@@ -48,7 +49,7 @@ namespace KspTest.Runner
                 string? why;
                 using (FileMutex.Acquire(lockPath + ".gate", "another run taking a KSP slot", TimeSpan.FromMinutes(1), log))
                 {
-                    why = SlotBusy(lockPath, root, maxKsps);
+                    why = SlotBusy(lockPath, install, maxKsps);
                     if (why == null && l.TryCreate($"install={root} state=loading {description}"))
                         return l;
                 }
@@ -104,8 +105,9 @@ namespace KspTest.Runner
         }
 
         // why a slot for this install cannot be taken now, or null
-        private static string? SlotBusy(string lockPath, string root, int maxKsps)
+        private static string? SlotBusy(string lockPath, KspInstall install, int maxKsps)
         {
+            string root = install.Root.TrimEnd('\\', '/');
             if (File.Exists(lockPath))
             {
                 string text = SafeRead(lockPath);
@@ -122,19 +124,17 @@ namespace KspTest.Runner
                 return $"{slots.Count} of {maxKsps} slots taken";
             if (slots.FirstOrDefault(s => s.Contains("state=loading")) is string loading)
                 return $"a KSP is loading ({loading.Trim()})";
-            foreach (Process p in KspInstall.RunningKsps())
-            {
-                string? exe = KspInstall.PathOf(p);
-                string? dir = exe == null ? null : Path.GetDirectoryName(exe);
-                if (dir == null || !installs.Any(i => i.Equals(dir, StringComparison.OrdinalIgnoreCase)))
-                    return $"a KSP that is no slot's is running ({exe ?? p.Id.ToString()})";
-            }
+            if (install.Running().FirstOrDefault() is Process here)
+                return $"a KSP is running from {root} ({KspInstall.PathOf(here) ?? here.Id.ToString()})";
 
             return null;
         }
 
-        /// <summary>Waits for the lock and takes it (or finds it held by the parent that started this run).</summary>
-        public static KspLock Acquire(string path, string description, TimeSpan wait, Action<string> log)
+        /// <summary>
+        ///     Waits for the lock and takes it (or finds it held by the parent that started this run), for a run that plays
+        ///     in install.
+        /// </summary>
+        public static KspLock Acquire(string path, KspInstall install, string description, TimeSpan wait, Action<string> log)
         {
             var l = new KspLock(path);
             int inherited = int.TryParse(Environment.GetEnvironmentVariable(InheritedLockVariable), out int p) ? p : 0;
@@ -156,7 +156,8 @@ namespace KspTest.Runner
                     heldByParent = live && m.Success && inherited != 0 && int.Parse(m.Groups[1].Value) == inherited;
                 }
 
-                var others = KspInstall.RunningKsps();
+                // only a KSP in the install the run plays in: one from another folder is someone's game
+                var others = install.Running();
                 if (heldByParent && others.Count == 0)
                     return l; // the parent's lock is this run's; the parent removes it
 
@@ -172,7 +173,7 @@ namespace KspTest.Runner
                 if (DateTime.Now >= nextNote)
                 {
                     log(holder != null ? $"waiting for another KSP run to finish: lock held ({holder})"
-                        : $"waiting for another KSP run to finish: KSP running ({string.Join(", ", others.ConvertAll(o => KspInstall.PathOf(o) ?? o.Id.ToString()))})");
+                        : $"waiting for the KSP running from {install.Root} to exit ({string.Join(", ", others.ConvertAll(o => KspInstall.PathOf(o) ?? o.Id.ToString()))})");
                     nextNote = DateTime.Now.AddMinutes(5);
                 }
 

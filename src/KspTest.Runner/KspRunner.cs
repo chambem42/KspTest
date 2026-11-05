@@ -36,7 +36,7 @@ namespace KspTest.Runner
             string tests = (names.FirstOrDefault() ?? "") + (names.Length > 1 ? $" +{names.Length - 1}" : "");
             using KspLock? kspLock = o.LockFile == null ? null
                 : o.MaxKsps > 1 ? KspLock.AcquireSlot(o.LockFile, install, o.MaxKsps, $"test={tests}", TimeSpan.FromSeconds(o.WaitForOtherKspSec), Say)
-                : KspLock.Acquire(o.LockFile, $"install={install.Root} test={tests}", TimeSpan.FromSeconds(o.WaitForOtherKspSec), Say);
+                : KspLock.Acquire(o.LockFile, install, $"install={install.Root} test={tests}", TimeSpan.FromSeconds(o.WaitForOtherKspSec), Say);
             // once the tests start: the next slot's KSP may load, and the caller has a look at the loaded install
             void Loaded()
             {
