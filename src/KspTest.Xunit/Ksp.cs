@@ -298,14 +298,16 @@ namespace KspTest.Xunit
 
                 batch.Result = run();
                 Live.Say($"{tag}: KSP session {batch.Result.Status} ({batch.Result.DurationSec:F0} s)");
-                // a KSP that crashed: once more, a new one for the tests it did not finish, so a rare native crash costs the
-                // test it was in rather than every test after it; the crash still shows, as a warning
+                // a KSP that crashed or froze (killed after its logs went quiet): once more, a new one for the tests it did
+                // not finish, so a rare native crash or hang costs the test it was in rather than every test after it; it
+                // still shows, as a warning
                 List<Batching.Request> left;
                 lock (batch)
                     left = runs.Where(q => !batch.Done.ContainsKey(q)).ToList();
-                if (batch.Result.Status == "crashed" && left.Count > 0)
+                if ((batch.Result.Status == "crashed" || batch.Result.Status == "frozen") && left.Count > 0)
                 {
-                    Live.Warn($"KSP crashed during {ShortName(left[0].Test)}: {batch.Result.Crash}. {tag}: a new KSP for the {left.Count} test(s) it did not finish");
+                    string how = batch.Result.Status == "crashed" ? $"crashed during {ShortName(left[0].Test)}: {batch.Result.Crash}" : $"froze during {ShortName(left[0].Test)}";
+                    Live.Warn($"KSP {how}. {tag}: a new KSP for the {left.Count} test(s) it did not finish");
                     o.Test = string.Join(",", left.Select(q => q.Test));
                     o.TimeoutSec = left.Max(q => q.Options.TimeoutSec);
                     batch.Result = run();
