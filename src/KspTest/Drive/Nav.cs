@@ -115,31 +115,35 @@ namespace KspTest
         /// <summary>
         /// Crew for the next craft: the editor fills a craft's seats from the available crew when it loads it, and
         /// the crew of every vessel left in flight (ToSpaceCenter saves those not on a launch site) stays assigned, so
-        /// a session's later launches would go up uncrewed, without control. Hires until <paramref name="count"/> are available,
-        /// and saves them: entering the editor loads the game from the save, so unsaved hires never reach a craft.
+        /// a session's later launches would go up uncrewed, without control. Hires until <paramref name="count"/> are available.
         /// </summary>
         public static void EnsureCrew(int count = 4)
         {
             KerbalRoster roster = HighLogic.CurrentGame?.CrewRoster;
             if (roster == null) return;
             int available = roster.Crew.Count(k => k.rosterStatus == ProtoCrewMember.RosterStatus.Available);
-            if (available >= count) return;
             for (int i = available; i < count; i++)
                 roster.GetNewKerbal(ProtoCrewMember.KerbalType.Crew).rosterStatus = ProtoCrewMember.RosterStatus.Available;
-            GamePersistence.SaveGame("persistent", HighLogic.SaveFolder, SaveMode.OVERWRITE);
-            Log.Info($"hired {count - available} crew ({available} were available)");
+            if (available < count)
+                Log.Info($"hired {count - available} crew ({available} were available)");
         }
 
-        /// <summary>Space Center -> editor, optionally loading a craft (absolute path) on entry.</summary>
+        /// <summary>
+        /// Space Center -> editor, optionally loading a craft (absolute path) on entry. Saves the game first, as the KSC
+        /// buttons do: the editor loads the game from the save, so whatever changed at the Space Center since (crew hired
+        /// for the craft, a warped clock) would be lost.
+        /// </summary>
         public static IEnumerator EnterEditor(TestContext ctx, EditorFacility facility = EditorFacility.VAB, string craftAbsPath = null)
         {
             if (HighLogic.LoadedScene != GameScenes.SPACECENTER)
                 throw new UITestFailure($"EnterEditor called from {HighLogic.LoadedScene}, expected SPACECENTER");
+            if (craftAbsPath != null && !File.Exists(craftAbsPath)) throw new UITestFailure("craft not found: " + craftAbsPath);
+            if (craftAbsPath != null) EnsureCrew();
+            if (string.IsNullOrEmpty(GamePersistence.SaveGame("persistent", HighLogic.SaveFolder, SaveMode.OVERWRITE)))
+                Log.Warn("the game was not saved before entering the editor: changes made at the Space Center are lost");
             if (craftAbsPath != null)
             {
-                if (!File.Exists(craftAbsPath)) throw new UITestFailure("craft not found: " + craftAbsPath);
                 Log.Info($"entering {facility} with craft {craftAbsPath}");
-                EnsureCrew();
                 EditorDriver.StartAndLoadVessel(craftAbsPath, facility);
                 LoadedCraft = craftAbsPath;
                 LoadedFacility = facility;
