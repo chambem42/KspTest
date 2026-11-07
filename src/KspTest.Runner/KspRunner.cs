@@ -241,7 +241,10 @@ namespace KspTest.Runner
                         hardDeadline = DateTime.Now.AddSeconds(double.Parse(test.Groups[2].Value, CultureInfo.InvariantCulture) + HardMarginSec);
                         Results(false);
                         startedTests.Add(test.Groups[1].Value);
-                        o.Progress?.Invoke($"{test.Groups[1].Value}: started (timeout {test.Groups[2].Value} s)");
+                        if (o.TestStarted != null)
+                            o.TestStarted(test.Groups[1].Value, int.Parse(test.Groups[2].Value, CultureInfo.InvariantCulture));
+                        else
+                            o.Progress?.Invoke($"{test.Groups[1].Value}: started (timeout {test.Groups[2].Value} s)");
                     }
                     else if (!begun && line.StartsWith("[EXC ") && HarnessLine.IsMatch(line))
                     {

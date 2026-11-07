@@ -158,11 +158,18 @@ namespace KspTest.Xunit
 
             foreach (string line in batch.TakeLog())
                 output.WriteLine(line);
+            string name = ShortName(request.Test);
             if (request.SkipReason != null)
+            {
+                Live.Outcome(name, "skip");
                 throw new SkipException(request.SkipReason);
+            }
+
             TestResult? t;
             lock (batch)
                 t = batch.Done.TryGetValue(request, out TestResult? done) ? done : batch.Result?[request.Test];
+            // the run's count of each outcome, for the tests no harness result reached (a session that failed, a crash)
+            Live.Outcome(name, t != null ? Outcome(t) : batch.Error is SkipException ? "skip" : "fail");
             if (t == null && batch.Error != null)
                 throw batch.Error is SkipException skip ? new SkipException(skip.Reason)
                     : batch.Requests.Count == 1 ? batch.Error is XunitException ? batch.Error : new XunitException(batch.Error.Message)
@@ -200,14 +207,12 @@ namespace KspTest.Xunit
         /// <summary>A batch's KSP session, on a thread of its own: the install or instance, which tests can run there, and the run.</summary>
         internal static void RunSession(Batching.Batch batch)
         {
-            string tag = ShortName(batch.Requests[0].Test) + (batch.Requests.Count > 1 ? $"+{batch.Requests.Count - 1}" : "") +
-                         (batch.Shards > 1 ? $" [{batch.Shard}/{batch.Shards}]" : "");
+            string tag = batch.Label;
             int clone = 0;
-            // progress by the session's first test (and how many more): a line about that test alone needs no prefix
             void Say(string line)
             {
                 batch.Log(line);
-                Live.Say(line.StartsWith(tag + ":") ? line : $"{tag}: {line}");
+                Live.Say($"{tag}: {line}");
             }
 
             try
@@ -226,7 +231,10 @@ namespace KspTest.Xunit
                     });
                 foreach (Batching.Request q in batch.Requests)
                     if ((q.SkipReason = SkipReason(install, instance, q)) != null)
-                        Say($"{ShortName(q.Test)}: skipped ({q.SkipReason})");
+                    {
+                        batch.Log($"{ShortName(q.Test)}: skipped ({q.SkipReason})");
+                        Live.Outcome(ShortName(q.Test), "skip", $"skipped ({q.SkipReason})");
+                    }
                 List<Batching.Request> runs = batch.Requests.Where(q => q.SkipReason == null).ToList();
                 lock (batch)
                 {
@@ -243,14 +251,18 @@ namespace KspTest.Xunit
                 o.TimeoutSec = runs.Max(q => q.Options.TimeoutSec);
                 o.Log = batch.Log;
                 o.Progress = Say;
+                o.TestStarted = (name, timeout) =>
+                {
+                    batch.Log($"{name}: started (timeout {timeout} s)");
+                    Live.Test(name, $"started (timeout {timeout} s)");
+                };
                 o.ResultsDirReady = dir => batch.ResultsDir = dir;
                 o.TestDone = t =>
                 {
                     Batching.Request? q = runs.FirstOrDefault(x => t.Requested == x.Test) ?? runs.FirstOrDefault(x => t.Id == x.Test || t.Test == x.Test);
                     if (q == null)
                         return;
-                    string done = $"{t.Test}: {t.Status} ({t.DurationSec:F0} s)";
-                    Live.Say(done.StartsWith(tag + ":") ? done : $"{tag}: {done}");
+                    Live.Outcome(ShortName(t.Test), Outcome(t), $"{t.Status} ({t.DurationSec:F0} s)");
                     lock (batch)
                     {
                         batch.Done[q] = t;
@@ -296,6 +308,9 @@ namespace KspTest.Xunit
                 }
             }
         }
+
+        /// <summary>A harness result as the run counts it: pass, fail or skip.</summary>
+        private static string Outcome(TestResult t) => t.Status == "skipped" ? "skip" : t.Passed ? "pass" : "fail";
 
         /// <summary>A test's method name, from its Namespace.Class.Method.</summary>
         private static string ShortName(string test) => test.Substring(test.LastIndexOf('.') + 1);

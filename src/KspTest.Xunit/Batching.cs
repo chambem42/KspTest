@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using KspTest.Runner;
 using Xunit;
@@ -78,13 +79,63 @@ namespace KspTest.Xunit
 
     /// <summary>
     ///     Progress to dotnet test's console as it happens, as xUnit diagnostic messages (KspTest.Xunit's xunit.runner.json
-    ///     turns them on): a test's own output only shows once it has ended.
+    ///     turns them on): a test's own output only shows once it has ended. Each line starts with the time, the test's
+    ///     number (by when it started) of the run's, and the outcomes so far: "[12:34:56 57/153 (55 passed, 1 failed)]".
     /// </summary>
     internal static class Live
     {
         public static IMessageSink? Sink;
 
-        public static void Say(string message) => Sink?.OnMessage(new DiagnosticMessage(message));
+        private static readonly object Gate = new object();
+        private static int _total, _numbered, _passed, _failed, _skipped;
+        private static readonly Dictionary<string, int> Numbers = new Dictionary<string, int>();
+        private static readonly HashSet<string> Counted = new HashSet<string>();
+
+        /// <summary>How many tests the run has: the KSP tests planned (not those skipped before they run).</summary>
+        public static void Planned(int total)
+        {
+            lock (Gate)
+                _total = total;
+        }
+
+        /// <summary>A line about the run or a session.</summary>
+        public static void Say(string message) => Emit(Prefix(null), message);
+
+        /// <summary>A line about a test, by its method name.</summary>
+        public static void Test(string test, string message) => Emit(Prefix(test), $"{test}: {message}");
+
+        /// <summary>A test's outcome (pass, fail or skip), counted once however often it is reported; said too with a message.</summary>
+        public static void Outcome(string test, string outcome, string? message = null)
+        {
+            lock (Gate)
+            {
+                Number(test);
+                if (Counted.Add(test))
+                {
+                    if (outcome == "pass") _passed++;
+                    else if (outcome == "skip") _skipped++;
+                    else _failed++;
+                }
+            }
+
+            if (message != null)
+                Test(test, message);
+        }
+
+        // under Gate
+        private static int Number(string test) => Numbers.TryGetValue(test, out int n) ? n : Numbers[test] = ++_numbered;
+
+        private static string Prefix(string? test)
+        {
+            lock (Gate)
+            {
+                int n = test == null ? _numbered : Number(test);
+                string skipped = _skipped > 0 ? $", {_skipped} skipped" : "";
+                return $"[{DateTime.Now:HH:mm:ss} {n}/{Math.Max(_total, _numbered)} ({_passed} passed, {_failed} failed{skipped})]";
+            }
+        }
+
+        private static void Emit(string prefix, string message) => Sink?.OnMessage(new DiagnosticMessage($"{prefix} {message}"));
     }
 
     /// <summary>
@@ -153,7 +204,15 @@ namespace KspTest.Xunit
             public string? ResultsDir;
             private readonly List<string> _log = new List<string>();
 
+            /// <summary>The run's sessions numbered as they are made: the planned ones in plan order, then any of a test's own.</summary>
+            public readonly int Number = Interlocked.Increment(ref _sessions);
+            private static int _sessions;
+
             public Batch(params Request[] requests) => Requests.AddRange(requests);
+
+            /// <summary>Its name in progress lines: "session 2 (37 tests, shard 2/4)".</summary>
+            public string Label => $"session {Number} ({Requests.Count} test{(Requests.Count == 1 ? "" : "s")}" +
+                                   (Shards > 1 ? $", shard {Shard}/{Shards})" : ")");
 
             public void Log(string line)
             {
@@ -186,12 +245,15 @@ namespace KspTest.Xunit
         public static void Plan(IEnumerable<IXunitTestCase> cases)
         {
             var planned = new List<Request>();
+            int total = 0;
             foreach (IXunitTestCase c in cases)
             {
                 if (!string.IsNullOrEmpty(c.SkipReason))
                     continue;
                 IAttributeInfo? fact = Ksp.FactOf(c.TestMethod);
                 string? test = fact?.GetNamedArgument<string>("Test");
+                if (fact != null && test != null)
+                    total++;
                 if (fact == null || test == null || fact.GetNamedArgument<bool>("Isolated"))
                     continue;
                 try
@@ -205,6 +267,7 @@ namespace KspTest.Xunit
                 }
             }
 
+            Live.Planned(total);
             int maxKsps = KspSettings.Current.MaxKsps;
             Dictionary<string, double>? took = maxKsps > 1
                 ? Durations.Load(new[] { KspSettings.Current.Results }.Concat(KspSettings.Current.DurationsFrom))

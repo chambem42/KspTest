@@ -138,6 +138,9 @@ namespace KspTest.Runner
         /// <summary>Each test's result as soon as the harness has written it, while the session goes on.</summary>
         public Action<TestResult>? TestDone;
 
+        /// <summary>Each test starting, by its method name, with its timeout in seconds (instead of a Progress line when set).</summary>
+        public Action<string, int>? TestStarted;
+
         /// <summary>The run's results folder, once it is made.</summary>
         public Action<string>? ResultsDirReady;
 
