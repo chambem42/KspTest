@@ -311,7 +311,7 @@ namespace KspTest.Xunit
                         var b = new Batch(shards[i].ToArray())
                         {
                             Shard = i + 1, Shards = shards.Count, SideBySide = maxKsps > 1,
-                            EstimateSec = maxKsps == 1 ? 0 : shards[i].Sum(r => took.TryGetValue(r.Test, out double t) ? t : UnknownSec),
+                            EstimateSec = maxKsps == 1 ? 0 : shards[i].Sum(r => took!.TryGetValue(r.Test, out double t) ? t : UnknownSec),
                         };
                         batches.Add(b);
                         foreach (Request r in shards[i])
