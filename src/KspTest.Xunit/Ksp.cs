@@ -276,6 +276,7 @@ namespace KspTest.Xunit
                 };
                 if (runs.Count > 1)
                     batch.Log($"one KSP session for {runs.Count} tests: {o.Test}");
+                Func<RunResult> run;
                 if (batch.SideBySide && instance)
                 {
                     // beside other sessions: in a thin clone of the instance of its own, holding one of the KSP slots
@@ -288,13 +289,28 @@ namespace KspTest.Xunit
                     Say($"in {Path.GetFileName(copy.Root.TrimEnd('\\', '/'))}, beside up to {KspSettings.Current.MaxKsps - 1} other KSPs");
                     o.Install = copy.Root;
                     o.MaxKsps = KspSettings.Current.MaxKsps;
-                    batch.Result = CloneSession(o, master, copy, runs[0].Local);
+                    run = () => CloneSession(o, master, copy, runs[0].Local);
                 }
                 else
                 {
-                    batch.Result = Session(o, install, instance, runs[0].Local);
+                    run = () => Session(o, install, instance, runs[0].Local);
                 }
+
+                batch.Result = run();
                 Live.Say($"{tag}: KSP session {batch.Result.Status} ({batch.Result.DurationSec:F0} s)");
+                // a KSP that crashed: once more, a new one for the tests it did not finish, so a rare native crash costs the
+                // test it was in rather than every test after it; the crash still shows, as a warning
+                List<Batching.Request> left;
+                lock (batch)
+                    left = runs.Where(q => !batch.Done.ContainsKey(q)).ToList();
+                if (batch.Result.Status == "crashed" && left.Count > 0)
+                {
+                    Live.Warn($"KSP crashed during {ShortName(left[0].Test)}: {batch.Result.Crash}. {tag}: a new KSP for the {left.Count} test(s) it did not finish");
+                    o.Test = string.Join(",", left.Select(q => q.Test));
+                    o.TimeoutSec = left.Max(q => q.Options.TimeoutSec);
+                    batch.Result = run();
+                    Live.Say($"{tag}: KSP session (again) {batch.Result.Status} ({batch.Result.DurationSec:F0} s)");
+                }
             }
             catch (Exception e)
             {

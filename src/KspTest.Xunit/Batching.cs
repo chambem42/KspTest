@@ -105,6 +105,16 @@ namespace KspTest.Xunit
         /// <summary>A line about the run or a session.</summary>
         public static void Say(string message) => Emit(Prefix(null), message);
 
+        /// <summary>
+        /// A line about the run as a GitHub Actions warning ("::warning::" at the start of its line, once the CI step has
+        /// dropped xUnit's prefix): an annotation on the run, for what passing tests would otherwise hide.
+        /// </summary>
+        public static void Warn(string message)
+        {
+            Say(message);
+            Sink?.OnMessage(new DiagnosticMessage("::warning::" + message));
+        }
+
         /// <summary>A line about a test, by its method name.</summary>
         public static void Test(string test, string message) => Emit(Prefix(test), $"{test}: {message}");
 

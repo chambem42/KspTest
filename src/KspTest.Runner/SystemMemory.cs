@@ -41,9 +41,11 @@ namespace KspTest.Runner
 
         /// <summary>
         ///     The crash report Unity wrote since <paramref name="since" /> for the KSP in <paramref name="installRoot" />,
-        ///     copied into <paramref name="resultsDir" /> (crash-error.log), summarized: what faulted, and whether the system
-        ///     was out of commit.  Null when there is none.  Every KSP on the machine writes its reports into the same folder,
-        ///     so one whose error.log names another install's executable is not this run's.
+        ///     copied into <paramref name="resultsDir" /> (crash-error.log, and the whole report in crash/: its dump, its
+        ///     player log), summarized: what faulted, and whether the system was out of commit.  Null when there is none.
+        ///     Every KSP on the machine writes its reports into the same folder, so one whose error.log names another
+        ///     install's executable is not this run's.  Unity's handler makes the report's folder before it writes into
+        ///     it: up to 30 s for its error.log.
         /// </summary>
         public static string? CollectCrash(DateTime since, string resultsDir, string installRoot)
         {
@@ -54,6 +56,11 @@ namespace KspTest.Runner
                          .Where(d => d.CreationTime >= since.AddSeconds(-5)).OrderByDescending(d => d.CreationTime))
             {
                 string error = Path.Combine(dir.FullName, "error.log");
+                for (int i = 0; i < 60 && !File.Exists(error); i++)
+                    System.Threading.Thread.Sleep(500);
+                // the handler goes on writing the dump and the logs after error.log
+                System.Threading.Thread.Sleep(3000);
+                CopyReport(dir, resultsDir);
                 if (!File.Exists(error))
                     return $"KSP crashed (report {dir.FullName}, no error.log)";
                 string text;
@@ -67,6 +74,19 @@ namespace KspTest.Runner
             }
 
             return null;
+        }
+
+        private static void CopyReport(DirectoryInfo dir, string resultsDir)
+        {
+            string to = Path.Combine(resultsDir, "crash");
+            try
+            {
+                Directory.CreateDirectory(to);
+                foreach (FileInfo f in dir.GetFiles())
+                    f.CopyTo(Path.Combine(to, f.Name), true);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
 
         private static string Summarize(DirectoryInfo dir, string error, string text, string resultsDir)
