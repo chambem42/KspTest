@@ -82,10 +82,24 @@ namespace KspTest
                 _lowAt = Time.realtimeSinceStartup + LowAfterSec;
         }
 
-        /// <summary>Every frame (TestRunner): back to the run's limit once no hold has been left for <see cref="LowAfterSec" />.</summary>
+        /// <summary>
+        /// Every frame outside a test (TestRunner; a serve session): back to the run's limit once no hold has been left
+        /// for <see cref="LowAfterSec" />.
+        /// </summary>
         public static void Tick()
         {
-            if (!_full || _holds > 0 || Time.realtimeSinceStartup < _lowAt)
+            if (Time.realtimeSinceStartup >= _lowAt)
+                LowNow();
+        }
+
+        /// <summary>
+        /// Back to the run's limit now unless a hold is on: TestRunner's at the start of each test, before its scene and
+        /// craft load. Not in the middle of one: the reload of every texture it starts crashed or froze KSP on Windows CI
+        /// runners (no GPU) twice, as ProceduralParts built a craft's parts.
+        /// </summary>
+        public static void LowNow()
+        {
+            if (!_full || _holds > 0)
                 return;
             var sw = Stopwatch.StartNew();
             _full = false;

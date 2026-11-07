@@ -121,7 +121,9 @@ namespace KspTest
 
         private void Update()
         {
-            Textures.Tick();
+            // during a test textures go low only at its start (Textures.LowNow)
+            if (_current == null || _finished)
+                Textures.Tick();
             if (_finished) return;
             float now = Time.realtimeSinceStartup;
             if (_current != null && !_current.TimedOut && now > _testDeadline)
@@ -276,6 +278,7 @@ namespace KspTest
             Snap.PassShots = ShotSwitch("passShots");
             double timeout = TimeoutOf(info);
             _testDeadline = Time.realtimeSinceStartup + (float)timeout;
+            Textures.LowNow();
             Log.Info($"==== TEST {info.Name} (starts at {info.Attr.StartsAt}, timeout {timeout:F0}s) ====");
 
             var missing = Env.Missing(info.Attr.Requires);
