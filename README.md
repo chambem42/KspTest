@@ -99,6 +99,12 @@ A mod keeps its tests in two projects of its own; the mod itself never reference
    GameData/KspTest. `dotnet test` reports each test as its shard's KSP finishes it. FAR's 65 tests: 17 minutes one
    at a time, 7 with `KSPTEST_MAX_KSPS=3` (12 cores, 64 GB, an 8 GB GPU; each KSP ~3.7 GB).
 
+   `KSPTEST_SHARD=k/N` splits the tests between N CI jobs: each session's tests are cut into pieces as for `maxKsps`,
+   the pieces dealt to the jobs longest first (each to the job with the least so far), and job k runs its own and
+   skips the rest ("runs in another CI job"). Every job deals alike from the same durations, so each test runs in
+   exactly one: give them all the same `KSPTEST_DURATIONS` (a CI cache restored by each). Progress lines start with
+   the time since the run started, the test's number and the outcomes so far: `[0:12:34 57/153 (55 passed, 1 failed)]`.
+
    The durations can come from more results folders, `durationsFrom` (`KSPTEST_DURATIONS`, `;` separated), for runs
    alike kept elsewhere: a coverage run's tests take many times as long, so they split by earlier coverage runs. The
    longest session waiting gets the next slot. A file a run collects (`collect`) is written into a folder of the

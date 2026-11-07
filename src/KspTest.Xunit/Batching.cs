@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -79,13 +80,16 @@ namespace KspTest.Xunit
 
     /// <summary>
     ///     Progress to dotnet test's console as it happens, as xUnit diagnostic messages (KspTest.Xunit's xunit.runner.json
-    ///     turns them on): a test's own output only shows once it has ended. Each line starts with the time, the test's
-    ///     number (by when it started) of the run's, and the outcomes so far: "[12:34:56 57/153 (55 passed, 1 failed)]".
+    ///     turns them on): a test's own output only shows once it has ended. Each line starts with the time since the run
+    ///     started, the test's number (by when it started) of the run's, and the outcomes so far:
+    ///     "[0:12:34 57/153 (55 passed, 1 failed)]".
     /// </summary>
     internal static class Live
     {
         public static IMessageSink? Sink;
 
+        // from the run's start: the framework sets Sink before it plans
+        private static readonly Stopwatch Clock = Stopwatch.StartNew();
         private static readonly object Gate = new object();
         private static int _total, _numbered, _passed, _failed, _skipped;
         private static readonly Dictionary<string, int> Numbers = new Dictionary<string, int>();
@@ -131,7 +135,8 @@ namespace KspTest.Xunit
             {
                 int n = test == null ? _numbered : Number(test);
                 string skipped = _skipped > 0 ? $", {_skipped} skipped" : "";
-                return $"[{DateTime.Now:HH:mm:ss} {n}/{Math.Max(_total, _numbered)} ({_passed} passed, {_failed} failed{skipped})]";
+                TimeSpan e = Clock.Elapsed;
+                return $"[{(int)e.TotalHours}:{e.Minutes:D2}:{e.Seconds:D2} {n}/{Math.Max(_total, _numbered)} ({_passed} passed, {_failed} failed{skipped})]";
             }
         }
 
@@ -199,6 +204,8 @@ namespace KspTest.Xunit
             /// <summary>Each test's result as the harness wrote it.</summary>
             public readonly Dictionary<Request, TestResult> Done = new Dictionary<Request, TestResult>();
             public bool Finished;
+            /// <summary>Its tests run in another CI job (KSPTEST_SHARD): each skips, saying so.</summary>
+            public string? Elsewhere;
             public RunResult? Result;
             public Exception? Error;
             public string? ResultsDir;
@@ -267,16 +274,35 @@ namespace KspTest.Xunit
                 }
             }
 
-            Live.Planned(total);
-            int maxKsps = KspSettings.Current.MaxKsps;
-            Dictionary<string, double>? took = maxKsps > 1
+            int maxKsps = KspSettings.Current.MaxKsps, job = KspSettings.Current.Shard, jobs = KspSettings.Current.Shards;
+            Dictionary<string, double>? took = maxKsps > 1 || jobs > 1
                 ? Durations.Load(new[] { KspSettings.Current.Results }.Concat(KspSettings.Current.DurationsFrom))
                 : null;
+            if (jobs > 1)
+            {
+                List<Request> mine = ForShard(planned, job, jobs, took!);
+                Request[] elsewhere = planned.Where(r => !mine.Contains(r)).ToArray();
+                if (elsewhere.Length > 0)
+                    lock (ByTest)
+                    {
+                        var away = new Batch(elsewhere) { Elsewhere = $"runs in another CI job (this is shard {job} of {jobs})" };
+                        foreach (Request r in elsewhere)
+                            ByTest[r.UniqueId] = away;
+                    }
+
+                Live.Say($"shard {job} of {jobs}: {mine.Count} of {planned.Count} tests, " +
+                         $"~{mine.Sum(r => took!.TryGetValue(r.Test, out double t) ? t : UnknownSec):F0} s by their last durations");
+                // the tests that run in a session of their own run in the first job
+                total = mine.Count + (job == 1 ? total - planned.Count : 0);
+                planned = mine;
+            }
+
+            Live.Planned(total);
             var batches = new List<Batch>();
             lock (ByTest)
                 foreach (IGrouping<string, Request> g in planned.GroupBy(r => r.Key))
                 {
-                    List<List<Request>> shards = took == null ? new List<List<Request>> { g.ToList() } : Split(g.ToList(), maxKsps, took);
+                    List<List<Request>> shards = maxKsps == 1 ? new List<List<Request>> { g.ToList() } : Split(g.ToList(), maxKsps, took!);
                     if (shards.Count > 1)
                         Live.Say($"{g.Count()} tests that share a session split into {shards.Count} side by side, by their last durations: " +
                                  string.Join(", ", shards.Select(s => $"{s.Count} tests ~{s.Sum(r => took!.TryGetValue(r.Test, out double t) ? t : UnknownSec):F0} s")));
@@ -284,8 +310,8 @@ namespace KspTest.Xunit
                     {
                         var b = new Batch(shards[i].ToArray())
                         {
-                            Shard = i + 1, Shards = shards.Count, SideBySide = took != null,
-                            EstimateSec = took == null ? 0 : shards[i].Sum(r => took.TryGetValue(r.Test, out double t) ? t : UnknownSec),
+                            Shard = i + 1, Shards = shards.Count, SideBySide = maxKsps > 1,
+                            EstimateSec = maxKsps == 1 ? 0 : shards[i].Sum(r => took.TryGetValue(r.Test, out double t) ? t : UnknownSec),
                         };
                         batches.Add(b);
                         foreach (Request r in shards[i])
@@ -295,10 +321,35 @@ namespace KspTest.Xunit
 
             // side by side, every session starts now: each waits for a KSP slot, not for xUnit to reach its first test
             // (the longest first, so they ask for a slot first)
-            if (took != null)
+            if (maxKsps > 1)
                 foreach (Batch b in batches.OrderByDescending(b => b.EstimateSec))
                     lock (b)
                         b.Session ??= Task.Run(() => Ksp.RunSession(b));
+        }
+
+        /// <summary>
+        ///     The planned tests CI job <paramref name="shard" /> of <paramref name="shards" /> runs: each session's tests split as
+        ///     for KSPs side by side, the pieces dealt to the jobs longest first, each to the job with the least so far (the
+        ///     lowest on a tie). Every job deals alike from the same durations, so each test runs in exactly one.
+        /// </summary>
+        internal static List<Request> ForShard(List<Request> planned, int shard, int shards, IReadOnlyDictionary<string, double> took)
+        {
+            double Sec(Request r) => took.TryGetValue(r.Test, out double t) ? t : UnknownSec;
+            var pieces = planned.GroupBy(r => r.Key).OrderBy(g => g.Key, StringComparer.Ordinal)
+                .SelectMany(g => Split(g.ToList(), shards, took))
+                .Select(p => (Tests: p, Sec: p.Sum(Sec)))
+                .OrderByDescending(p => p.Sec).ThenBy(p => p.Tests[0].Test, StringComparer.Ordinal).ToList();
+            var load = new double[shards];
+            var mine = new HashSet<Request>();
+            foreach ((List<Request> tests, double sec) in pieces)
+            {
+                int job = Array.IndexOf(load, load.Min());
+                load[job] += sec;
+                if (job == shard - 1)
+                    mine.UnionWith(tests);
+            }
+
+            return planned.Where(mine.Contains).ToList();
         }
 
         /// <summary>A shard runs no shorter than this: shorter, its KSP's load is too much of it.</summary>

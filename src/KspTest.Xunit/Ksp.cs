@@ -119,6 +119,9 @@ namespace KspTest.Xunit
             Batching.Request? request = batch?.Requests.FirstOrDefault(q => q.UniqueId == itest!.TestCase.UniqueID);
             if (batch == null || request == null || request.Test != test)
             {
+                // a session of its own: in the first CI job of a split run
+                if (KspSettings.Current.Shard > 1)
+                    throw new SkipException($"runs in CI job 1 (this is shard {KspSettings.Current.Shard} of {KspSettings.Current.Shards})");
                 // a call of its own (a fact without a Test, or asking for something else than planned): a KSP session of its own
                 IAttributeInfo? fact = itest == null ? null : FactOf(itest.TestCase.TestMethod);
                 request = Batching.Request.For(itest?.TestCase.UniqueID ?? test, test, parameters, save ?? fact?.GetNamedArgument<string>("Save"),
@@ -148,6 +151,8 @@ namespace KspTest.Xunit
         /// </summary>
         private static RunResult? RunIn(Batching.Batch batch, Batching.Request request, ITestOutputHelper output, ITest? itest)
         {
+            if (batch.Elsewhere != null)
+                throw new SkipException(batch.Elsewhere);
             lock (batch)
             {
                 batch.Session ??= Task.Run(() => RunSession(batch));

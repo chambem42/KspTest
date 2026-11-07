@@ -42,6 +42,12 @@ namespace KspTest.Xunit
         public int MaxKsps = 1;
 
         /// <summary>
+        ///     Which share of the tests this run is, of how many (KSPTEST_SHARD "k/N"): CI jobs splitting the tests between
+        ///     them, each running the tests <see cref="Batching" /> deals it and skipping the rest. 1 of 1 runs them all.
+        /// </summary>
+        public int Shard = 1, Shards = 1;
+
+        /// <summary>
         ///     More results folders the shards' durations come from ("durationsFrom", KSPTEST_DURATIONS ";"-separated) besides
         ///     the run's own: runs alike kept elsewhere, such as earlier coverage runs, whose tests take many times as long.
         /// </summary>
@@ -153,6 +159,13 @@ namespace KspTest.Xunit
             if (int.TryParse(Env("KSPTEST_MAX_KSPS"), out int maxKsps))
                 s.MaxKsps = maxKsps;
             s.MaxKsps = Math.Max(1, s.MaxKsps);
+            if (Env("KSPTEST_SHARD") is string shard)
+            {
+                string[] kn = shard.Split('/');
+                if (kn.Length != 2 || !int.TryParse(kn[0], out int k) || !int.TryParse(kn[1], out int n) || n < 1 || k < 1 || k > n)
+                    throw new InvalidOperationException($"KSPTEST_SHARD '{shard}': expected k/N, 1 <= k <= N");
+                (s.Shard, s.Shards) = (k, n);
+            }
             if (double.TryParse(Env("KSPTEST_TIMEOUT_SCALE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double scale) && scale > 0)
                 s.TimeoutScale = scale;
             if (Env("KSPTEST_DURATIONS") is string durations)

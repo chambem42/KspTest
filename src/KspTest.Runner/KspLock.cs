@@ -42,6 +42,8 @@ namespace KspTest.Runner
         public static KspLock AcquireSlot(string lockPath, KspInstall install, int maxKsps, string description, TimeSpan wait, Action<string> log)
         {
             string root = install.Root.TrimEnd('\\', '/');
+            // the gate and the slots go beside the lock, whose folder a fresh machine (a CI runner) does not have yet
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(lockPath))!);
             var l = new KspLock(SlotPath(lockPath, root));
             DateTime deadline = DateTime.Now + wait, nextNote = DateTime.Now;
             while (true)
