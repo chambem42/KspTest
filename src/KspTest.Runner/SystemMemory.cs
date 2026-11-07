@@ -58,18 +58,24 @@ namespace KspTest.Runner
                 string error = Path.Combine(dir.FullName, "error.log");
                 for (int i = 0; i < 60 && !File.Exists(error); i++)
                     System.Threading.Thread.Sleep(500);
+                string? text = null;
+                if (File.Exists(error))
+                {
+                    try { text = File.ReadAllText(error); }
+                    catch (IOException) { }
+                    // whose report: "D:\Games\KSP\KSP_x64.exe, run by Matt." (another install's is left alone, not copied)
+                    Match exe = Regex.Match(text ?? "", @"(?m)^(.+?)[\\/][^\\/]+\.exe, run by");
+                    if (exe.Success && !string.Equals(Path.GetFullPath(exe.Groups[1].Value.Trim()).TrimEnd('/', '\\'), root, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
+
                 // the handler goes on writing the dump and the logs after error.log
                 System.Threading.Thread.Sleep(3000);
                 CopyReport(dir, resultsDir);
                 if (!File.Exists(error))
                     return $"KSP crashed (report {dir.FullName}, no error.log)";
-                string text;
-                try { text = File.ReadAllText(error); }
-                catch (IOException) { return $"KSP crashed (report {dir.FullName})"; }
-                // "D:\Games\KSP\KSP_x64.exe, run by Matt."
-                Match exe = Regex.Match(text, @"(?m)^(.+?)[\\/][^\\/]+\.exe, run by");
-                if (exe.Success && !string.Equals(Path.GetFullPath(exe.Groups[1].Value.Trim()).TrimEnd('/', '\\'), root, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                if (text == null)
+                    return $"KSP crashed (report {dir.FullName})";
                 return Summarize(dir, error, text, resultsDir);
             }
 

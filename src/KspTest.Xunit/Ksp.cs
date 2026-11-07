@@ -298,20 +298,50 @@ namespace KspTest.Xunit
 
                 batch.Result = run();
                 Live.Say($"{tag}: KSP session {batch.Result.Status} ({batch.Result.DurationSec:F0} s)");
-                // a KSP that crashed or froze (killed after its logs went quiet): once more, a new one for the tests it did
-                // not finish, so a rare native crash or hang costs the test it was in rather than every test after it; it
-                // still shows, as a warning
-                List<Batching.Request> left;
-                lock (batch)
-                    left = runs.Where(q => !batch.Done.ContainsKey(q)).ToList();
-                if ((batch.Result.Status == "crashed" || batch.Result.Status == "frozen") && left.Count > 0)
+                // a KSP that crashed, froze (killed after its logs went quiet) or ended without a result: a new one for the
+                // tests it did not finish, so a native crash or hang costs at most the test it was in, not every test after
+                // it. That test gets one more try; ending the same way again it fails, saying how, and the tests after it go
+                // on. Each restart shows as a warning; at most MaxRestarts per session
+                var retried = new HashSet<Batching.Request>();
+                for (int restarts = 0; restarts < MaxRestarts; restarts++)
                 {
-                    string how = batch.Result.Status == "crashed" ? $"crashed during {ShortName(left[0].Test)}: {batch.Result.Crash}" : $"froze during {ShortName(left[0].Test)}";
-                    Live.Warn($"KSP {how}. {tag}: a new KSP for the {left.Count} test(s) it did not finish");
+                    string status = batch.Result.Status;
+                    if (status != "crashed" && status != "frozen" && status != "no-result")
+                        break;
+                    List<Batching.Request> left;
+                    lock (batch)
+                        left = runs.Where(q => !batch.Done.ContainsKey(q)).ToList();
+                    if (left.Count == 0)
+                        break;
+                    // the tests run in plan order: the first without a result is the one KSP was in
+                    Batching.Request culprit = left[0];
+                    string name = ShortName(culprit.Test);
+                    string how = status == "crashed" ? $"crashed during {name}: {batch.Result.Crash}"
+                        : status == "frozen" ? $"froze during {name}" : $"ended without a result during {name}";
+                    if (retried.Add(culprit))
+                    {
+                        Live.Warn($"KSP {how}. {tag}: a new KSP for the {left.Count} test(s) it did not finish, {name} once more");
+                    }
+                    else
+                    {
+                        var failed = new TestResult { Test = name, Id = culprit.Test, Requested = culprit.Test, Status = "fail", Message = $"KSP {how}, the second time" };
+                        lock (batch)
+                        {
+                            batch.Done[culprit] = failed;
+                            Monitor.PulseAll(batch);
+                        }
+
+                        Live.Outcome(name, "fail", $"fail: KSP {how}, the second time");
+                        left.RemoveAt(0);
+                        if (left.Count == 0)
+                            break;
+                        Live.Warn($"KSP {how} again: {name} failed. {tag}: a new KSP for the {left.Count} test(s) after it");
+                    }
+
                     o.Test = string.Join(",", left.Select(q => q.Test));
                     o.TimeoutSec = left.Max(q => q.Options.TimeoutSec);
                     batch.Result = run();
-                    Live.Say($"{tag}: KSP session (again) {batch.Result.Status} ({batch.Result.DurationSec:F0} s)");
+                    Live.Say($"{tag}: KSP session (restart {restarts + 1}) {batch.Result.Status} ({batch.Result.DurationSec:F0} s)");
                 }
             }
             catch (Exception e)
@@ -331,6 +361,9 @@ namespace KspTest.Xunit
                 }
             }
         }
+
+        /// <summary>New KSPs a session may start after crashes, hangs or lost results, before the rest of its tests fail.</summary>
+        private const int MaxRestarts = 10;
 
         /// <summary>A harness result as the run counts it: pass, fail or skip.</summary>
         private static string Outcome(TestResult t) => t.Status == "skipped" ? "skip" : t.Passed ? "pass" : "fail";
