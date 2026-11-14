@@ -188,14 +188,15 @@ namespace KspTest.Xunit.Generator
         }
 
         // CKAN identifiers and repository mods (url@commit/path: KspTest.Runner.RepoMod) as they are; a local mod (a path
-        // to its GameData/ModName folder) from the in-game project's folder
+        // to its GameData/ModName folder) from the in-game project's folder, either slash a separator (a "..\" path
+        // written on Windows builds on Linux too)
         private static string? Mods(string? mods, string projectDir)
         {
             if (string.IsNullOrWhiteSpace(mods))
                 return null;
             IEnumerable<string> entries = mods!.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries).Select(m => m.Trim()).Where(m => m.Length > 0)
                 .Select(m => (m.Contains("/") || m.Contains("\\")) && !m.Contains("://") && projectDir.Length > 0
-                    ? Path.GetFullPath(Path.Combine(projectDir, m)) : m);
+                    ? Path.GetFullPath(Path.Combine(projectDir, m.Replace('\\', '/'))) : m);
             return string.Join(";", entries);
         }
 

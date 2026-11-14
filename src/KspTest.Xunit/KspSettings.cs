@@ -177,7 +177,7 @@ namespace KspTest.Xunit
             s.Mods.InsertRange(0, Lines(Path.Combine(baseDir, "ksptest-mods.txt")).Select(m => RepoMod.Is(m) ? RepoMod.Folder(m) : m));
             s.Overlays.AddRange(Lines(Path.Combine(baseDir, "ksptest-overlays.txt")).Select(m => RepoMod.Is(m) ? RepoMod.Folder(m) : m));
             // the settings' mods given as paths are local mods, like a KspMod item's
-            s.Overlays.AddRange(s.Mods.Where(InstanceManager.IsLocal).Select(m => Path.GetFullPath(Path.Combine(baseDir, m)).TrimEnd('/', '\\')));
+            s.Overlays.AddRange(s.Mods.Where(InstanceManager.IsLocal).Select(m => Path.GetFullPath(Path.Combine(baseDir, m.Replace('\\', '/'))).TrimEnd('/', '\\')));
             s.Mods.RemoveAll(InstanceManager.IsLocal);
 
             s.Saves = Path.GetFullPath(Path.Combine(baseDir, s.Saves));
