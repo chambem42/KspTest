@@ -78,6 +78,49 @@ namespace KspTest.Runner
             catch (IOException) { /* still loading as far as the others know: they wait for this run instead */ }
         }
 
+        /// <summary>
+        ///     Claims a thin clone's install for this process (a file beside the lock, "&lt;lock&gt;-claim.&lt;folder&gt;-&lt;hash&gt;",
+        ///     outside the slots' names), so runs in other processes (another dotnet test) pick other clone numbers: false
+        ///     while another live process claims it, a slot plays in it or a KSP runs from it (someone's own game in a clone).
+        ///     Each process numbers its clones from 1, and brings a clone up to date before it takes its slot.
+        /// </summary>
+        public static bool TryClaim(string lockPath, string root)
+        {
+            root = Path.GetFullPath(root).TrimEnd('\\', '/');
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(lockPath))!);
+            int me = Process.GetCurrentProcess().Id;
+            using (FileMutex.Acquire(lockPath + ".gate", "another run claiming a clone", TimeSpan.FromMinutes(1), _ => { }))
+            {
+                string claim = ClaimPath(lockPath, root);
+                if (File.Exists(claim))
+                {
+                    Match m = Regex.Match(SafeRead(claim), @"pid=(\d+)");
+                    if (m.Success && int.Parse(m.Groups[1].Value) != me && IsRunning(int.Parse(m.Groups[1].Value)))
+                        return false;
+                }
+                if (LiveSlots(lockPath).Any(s => Regex.Match(s, @"install=(.+?) state=").Groups[1].Value.Equals(root, StringComparison.OrdinalIgnoreCase)))
+                    return false;
+                if (new KspInstall(root).Running().Count > 0)
+                    return false;
+                try
+                {
+                    File.WriteAllText(claim, $"pid={me} install={root}", Encoding.ASCII);
+                }
+                catch (IOException)
+                {
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        /// <summary>Gives back a clone this process claimed (<see cref="TryClaim" />).</summary>
+        public static void Release(string lockPath, string root) =>
+            TryDelete(ClaimPath(lockPath, Path.GetFullPath(root).TrimEnd('\\', '/')));
+
+        private static string ClaimPath(string lockPath, string root) =>
+            SlotPath(lockPath, root).Replace(Path.GetFileName(lockPath) + ".", Path.GetFileName(lockPath) + "-claim.");
+
         private static string SlotPath(string lockPath, string root)
         {
             uint hash = 2166136261;

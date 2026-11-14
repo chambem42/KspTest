@@ -222,6 +222,13 @@ clone copies it. Give each Serve session its own `port` (and `ksptest serve --po
 into its results, named `<time>-<test>@N`. Two RP-1 clones with `--textures low` take ~10 GiB and ~2.7 GB of GPU memory
 each.
 
+Runs in separate processes (two `dotnet test` runs) can share an instance's clones: each process takes the lowest clone
+number that it is not using, that no other live process has claimed (a `<lock>-claim.<clone>` file beside the lock) and
+that no slot plays in or KSP runs from (someone's own game in a clone), so the second run plays in `@4` while the first
+has `@1`-`@3`. The slots still cap the KSPs at the `KSPTEST_MAX_KSPS` of the run taking one, so give the second run a
+higher one. The runs share the instance's master, so they need the same overlays: a run with another build of a mod
+overwrites the master's copy under the first.
+
 ### Serve sessions
 
 For work that loads, measures and flies a craft over and over, a Serve session keeps one KSP up and answers requests

@@ -280,12 +280,14 @@ namespace KspTest.Xunit
                 if (batch.SideBySide && instance)
                 {
                     // beside other sessions: in a thin clone of the instance of its own, holding one of the KSP slots
-                    clone = Clones.Take(batch.EstimateSec);
                     KspInstall master = install;
+                    clone = Clones.Take(batch.EstimateSec, master.Root);
                     KspInstall copy;
+                    // (DeployLock too: the clone copies the master's root files, KspTest-local.txt among them, which another
+                    // session's deploy may be writing)
                     lock (InstallLock)
-                        copy = ThinClone.Ensure(master.Root, ThinClone.PathFor(master.Root, Path.GetDirectoryName(master.Root.TrimEnd('\\', '/'))!, clone), batch.Log,
-                            CollectFolders());
+                        lock (DeployLock)
+                            copy = ThinClone.Ensure(master.Root, Clones.PathOf(master.Root, clone), batch.Log, CollectFolders());
                     Say($"in {Path.GetFileName(copy.Root.TrimEnd('\\', '/'))}, beside up to {KspSettings.Current.MaxKsps - 1} other KSPs");
                     o.Install = copy.Root;
                     o.MaxKsps = KspSettings.Current.MaxKsps;
@@ -497,31 +499,85 @@ namespace KspTest.Xunit
             .Where(d => d.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
         /// <summary>
-        ///     The clone numbers (1..KspSettings.MaxKsps) for the sessions of this process running side by side, the longest
-        ///     waiting session (by its estimate) served first: the longest ones start early and the short ones fill in.
+        ///     The clone numbers for the sessions of this process running side by side (at most KspSettings.MaxKsps at once),
+        ///     the longest waiting session (by its estimate) served first: the longest ones start early and the short ones
+        ///     fill in. Each the lowest this process is not using and no other process has (KspLock.TryClaim: another dotnet
+        ///     test's run, a KSP someone runs from a clone), so runs in several processes share an instance's clones.
         /// </summary>
         private static class Clones
         {
+            private const int MaxClone = 64;
             private static readonly object Gate = new object();
-            private static readonly SortedSet<int> Free = new SortedSet<int>(Enumerable.Range(1, KspSettings.Current.MaxKsps));
+            private static readonly Dictionary<int, string> InUse = new Dictionary<int, string>();   // number: its install
             // waiting sessions, longest first (then first come)
             private static readonly SortedSet<(double NegSec, long Seq)> Waiting = new SortedSet<(double, long)>();
             private static long seq;
+            // the clones this process has played in, and when one of them was first found still busy after it gave it
+            // back (its KSP still exiting): it waits for those up to OwnWait before making a clone it has not used
+            private static readonly HashSet<int> Used = new HashSet<int>();
+            private static DateTime? ownBusySince;
+            private static readonly TimeSpan OwnWait = TimeSpan.FromSeconds(60);
 
-            /// <summary>The lowest free one once no longer session is waiting, waiting for one to be given back.</summary>
-            public static int Take(double estimateSec)
+            public static string PathOf(string masterRoot, int n) =>
+                ThinClone.PathFor(masterRoot, Path.GetDirectoryName(masterRoot.TrimEnd('\\', '/'))!, n);
+
+            /// <summary>
+            ///     The lowest one free here and claimed once no longer session is waiting, waiting for one otherwise: one
+            ///     this process has played in first (a fresh clone is a copy to make), a new one only once none of those is
+            ///     to be had or they have been busy for OwnWait.
+            /// </summary>
+            public static int Take(double estimateSec, string masterRoot)
             {
+                string lockPath = KspSettings.Current.LockFile!;
                 lock (Gate)
                 {
                     var me = (-estimateSec, seq++);
                     Waiting.Add(me);
-                    while (Free.Count == 0 || Waiting.Min != me)
-                        Monitor.Wait(Gate);
-                    Waiting.Remove(me);
-                    int n = Free.Min;
-                    Free.Remove(n);
-                    Monitor.PulseAll(Gate);
-                    return n;
+                    try
+                    {
+                        while (true)
+                        {
+                            if (InUse.Count < KspSettings.Current.MaxKsps && Waiting.Min == me)
+                            {
+                                bool ownBusy = false;
+                                foreach (int n in Used.OrderBy(x => x))
+                                {
+                                    if (InUse.ContainsKey(n))
+                                        continue;
+                                    if (Claim(n))
+                                        return n;
+                                    ownBusy = true;
+                                }
+                                if (ownBusy && (ownBusySince ??= DateTime.Now) + OwnWait > DateTime.Now)
+                                {
+                                    Monitor.Wait(Gate, 2000);
+                                    continue;
+                                }
+                                for (int n = 1; n <= MaxClone; n++)
+                                    if (!Used.Contains(n) && Claim(n))
+                                        return n;
+                            }
+                            // (every clone up to MaxClone another's: one may be given back)
+                            Monitor.Wait(Gate, 5000);
+                        }
+                    }
+                    finally
+                    {
+                        // (also when a claim throws: a stale entry would hold up every later session)
+                        Waiting.Remove(me);
+                        Monitor.PulseAll(Gate);
+                    }
+                }
+
+                bool Claim(int n)
+                {
+                    string root = PathOf(masterRoot, n);
+                    if (!KspLock.TryClaim(lockPath, root))
+                        return false;
+                    InUse[n] = root;
+                    Used.Add(n);
+                    ownBusySince = null;
+                    return true;
                 }
             }
 
@@ -529,7 +585,9 @@ namespace KspTest.Xunit
             {
                 lock (Gate)
                 {
-                    Free.Add(n);
+                    if (InUse.TryGetValue(n, out string? root))
+                        KspLock.Release(KspSettings.Current.LockFile!, root);
+                    InUse.Remove(n);
                     Monitor.PulseAll(Gate);
                 }
             }
