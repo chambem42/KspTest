@@ -125,6 +125,14 @@ mods: the path of a `GameData/ModName` folder, for a mod built from source or on
 <KspOverlay Include="..\..\GameData\FerramAerospaceResearch" />    <!-- the same, named for a mod over CKAN's copy -->
 ```
 
+A mod can also come from a git repository at a commit: `https://github.com/owner/repo@commit/GameData/ModName`, with
+`?build=Source/Project.csproj` if its plugin is built rather than committed. The repository is cloned once into
+`sources` beside the instances folder (`KSPTEST_SOURCES` moves it), checked out at the commit, and its
+`GameData/ModName` is a local mod like any other, counted by its folder's name (the same instance as a local copy of
+it). The project is built (`dotnet build -c Release`) before the first run that needs it, against that run's
+instance: its `Managed` assemblies and every DLL in its GameData, flat in one folder passed as `RefsDir`,
+`ReferencePath` and `KSPRoot`. Pinned to a commit, a run has the same mod on every machine, CI included.
+
 A test adds its own with `[UITest(Mods = "MechJeb2")]`, and `mods` in `ksptest.json` (`KSPTEST_MODS`) adds to every
 run, CKAN identifiers or paths alike. Each distinct set of mods is its own instance, a local mod counting by its folder
 name as a CKAN mod does by its identifier. The local mods are copied into the instance (made the same as their folder)

@@ -165,11 +165,16 @@ namespace KspTest.Runner
         public static bool IsLocal(string mod) => mod.Contains("/") || mod.Contains("\\");
 
         /// <summary>A local mod's name, as GameData has it: its folder's.</summary>
-        public static string LocalName(string path) => Path.GetFileName(path.Trim().TrimEnd('/', '\\'));
+        public static string LocalName(string path) =>
+            RepoMod.Is(path) ? RepoMod.Name(path) : Path.GetFileName(path.Trim().TrimEnd('/', '\\'));
 
-        /// <summary>"Id;Id=version, Id" into identifiers.</summary>
+        /// <summary>
+        ///     "Id;Id=version, Id" into identifiers; a mod given as a repository at a commit becomes its folder in its
+        ///     checkout (<see cref="RepoMod" />), a local mod like a path.
+        /// </summary>
         public static IEnumerable<string> Split(string? mods) =>
-            (mods ?? "").Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries).Select(m => m.Trim()).Where(m => m.Length > 0);
+            (mods ?? "").Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries).Select(m => m.Trim()).Where(m => m.Length > 0)
+                .Select(m => RepoMod.Is(m) ? RepoMod.Folder(m) : m);
 
         private static string GameBuild(KspInstall source)
         {

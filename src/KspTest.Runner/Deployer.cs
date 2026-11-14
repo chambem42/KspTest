@@ -173,7 +173,11 @@ namespace KspTest.Runner
             }
 
             foreach (string f in wanted)
+            {
+                // (one from a repository built first, against this install, if it has not been)
+                RepoMod.EnsureBuilt(f, install, log);
                 Overlay(install, f, log);
+            }
             File.WriteAllLines(record, names);
         }
 
