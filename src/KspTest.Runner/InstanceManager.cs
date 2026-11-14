@@ -67,6 +67,8 @@ namespace KspTest.Runner
                     log($"instance {name}: {dir}");
                     info.LastUsed = DateTime.Now;
                     info.Save(dir);
+                    // (KSPBurst's compiler package, unpacked by its first run here: the shared one's)
+                    BurstShare.Share(dir, Root, log);
                     return new KspInstall(dir);
                 }
 
@@ -115,12 +117,29 @@ namespace KspTest.Runner
             }
         }
 
-        /// <summary>The instances in the instances folder, finished or not.</summary>
+        /// <summary>The instances in the instances folder, finished or not (not its .shared).</summary>
         public List<InstanceInfo> List() =>
             !Directory.Exists(Root)
                 ? new List<InstanceInfo>()
-                : Directory.GetDirectories(Root).Select(d => InstanceInfo.Load(d) ?? new InstanceInfo { Name = Path.GetFileName(d) })
+                : Directory.GetDirectories(Root).Where(d => !Path.GetFileName(d).StartsWith("."))
+                    .Select(d => InstanceInfo.Load(d) ?? new InstanceInfo { Name = Path.GetFileName(d) })
                     .OrderBy(i => i.Name).ToList();
+
+        /// <summary>
+        ///     The instances not used in a number of days (their manifests' last use), and the thin clones of each
+        ///     (name@n): what <c>ksptest instances prune</c> lists, and deletes with --delete. Each by its own manifest's
+        ///     last use (a clone of an install outside the folder too); one without a manifest only with its instance.
+        /// </summary>
+        public List<string> Unused(double days)
+        {
+            DateTime before = DateTime.Now.AddDays(-days);
+            List<InstanceInfo> all = List();
+            var unused = new HashSet<string>(all.Where(i => i.Ready && i.LastUsed < before).Select(i => i.Name), StringComparer.OrdinalIgnoreCase);
+            foreach (InstanceInfo c in all.Where(i => i.Name.Contains('@')))
+                if (unused.Contains(c.Name.Substring(0, c.Name.IndexOf('@'))))
+                    unused.Add(c.Name);
+            return unused.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+        }
 
         /// <summary>Deletes an instance (by name): the source's folders it links to stay.</summary>
         public void Delete(string name, Action<string> log)

@@ -185,6 +185,31 @@ namespace KspTest.Tool
             if (s.Instances == null)
                 throw new ArgumentException("no instances folder set: run ksptest setup");
             var manager = new InstanceManager(s);
+            if (a.Positional.FirstOrDefault() == "share-burst")
+            {
+                // every instance's KSPBurst compiler package a junction to one shared copy (BurstShare)
+                long freed = 0;
+                foreach (InstanceInfo i in manager.List().Where(i => !i.Name.Contains('@')))
+                    freed += BurstShare.Share(Path.Combine(manager.Root, i.Name), manager.Root, Console.WriteLine);
+                Console.WriteLine($"{freed / 1073741824.0:F1} GB freed");
+                return 0;
+            }
+            if (a.Positional.FirstOrDefault() == "prune")
+            {
+                // instances unused for --days (default 14) and their clones: listed, deleted with --delete
+                double days = double.Parse(a.Get("days") ?? "14", System.Globalization.CultureInfo.InvariantCulture);
+                List<string> unused = manager.Unused(days);
+                Console.WriteLine($"{unused.Count} instance(s) unused for {days:F0} days in {manager.Root}:");
+                foreach (string name in unused)
+                    Console.WriteLine("  " + name);
+                if (a.Flags.Contains("delete"))
+                    foreach (string name in unused)
+                    {
+                        try { manager.Delete(name, Console.WriteLine); }
+                        catch (Exception e) { Console.WriteLine($"  {name}: not deleted: {e.Message}"); }
+                    }
+                return 0;
+            }
             if (a.Positional.FirstOrDefault() == "delete")
             {
                 IEnumerable<string> names = a.Flags.Contains("all") ? manager.List().Select(i => i.Name) : a.Positional.Skip(1);
