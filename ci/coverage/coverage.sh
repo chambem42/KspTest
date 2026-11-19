@@ -44,8 +44,9 @@ instrument() {
     case "$skip" in *" $(basename "$f") "*) continue ;; esac
     deps+=("-d=$(win "$f")")
   done < <(find "$g"/KSP*_Data/Managed "$g"/GameData -name '*.dll' -not -path '*/GameData/KspTest/*' 2>/dev/null)
+  # -p: not code a package put into the build (Krafs.Publicizer's attribute, say), only the mod's own
   "$KSPTEST_WORK/altcover/tools/net472/AltCover.exe" -i="$(win "$COV/in")" -o="$(win "$COV/out")" --save --portable --linecover \
-    -a=ExcludeFromCodeCoverage "${deps[@]}" > "$COV/instrument.log" 2>&1 || { tail -20 "$COV/instrument.log"; return 1; }
+    -a=ExcludeFromCodeCoverage '-p=[\\/]\.nuget[\\/]' "${deps[@]}" > "$COV/instrument.log" 2>&1 || { tail -20 "$COV/instrument.log"; return 1; }
   # every visit call goes to FastVisit, which passes only a point's first visit on to AltCover's recorder
   dotnet build "$HERE/FastVisit" -c Release -v q -nologo -o "$COV/fastvisit"
   local out=()

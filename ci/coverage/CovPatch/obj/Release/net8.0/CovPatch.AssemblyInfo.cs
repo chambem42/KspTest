@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("In-game automated tests for Kerbal Space Program mods.")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.0+71e024b1189321f8d519d4c0b2650d783b7f24f9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.0+11870ba653938e25a7a872db4868f26a4861599e")]
 [assembly: System.Reflection.AssemblyProductAttribute("CovPatch")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CovPatch")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.1.0.0")]
