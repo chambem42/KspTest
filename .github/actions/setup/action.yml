@@ -77,6 +77,16 @@ runs:
         } >> "$GITHUB_ENV"
         echo "game=$w/ksp" >> "$GITHUB_OUTPUT"
         echo "KspTest: $root ($(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo 'its tarball'))"
+    # the packages' .deb files from earlier runs on this runner image: an Ubuntu mirror can crawl (one run took 10
+    # minutes for 25 MB), the install itself takes seconds
+    - name: Linux package cache
+      id: apt-cache
+      if: runner.os == 'Linux'
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.ksptest-apt
+        key: ksptest-apt-${{ env.ImageOS }}-${{ env.ImageVersion }}-1
+        restore-keys: ksptest-apt-${{ env.ImageOS }}-
     - name: Linux packages
       if: runner.os == 'Linux'
       shell: bash
@@ -84,15 +94,29 @@ runs:
         # unpacking is most of an install's time on a runner: no fsync per file, no man page index
         echo force-unsafe-io | sudo tee /etc/dpkg/dpkg.cfg.d/ksptest-unsafe-io >/dev/null
         sudo rm -f /var/lib/man-db/auto-update
-        sudo apt-get update -q
+        # a stalled mirror given up on quickly and tried again; the .deb files kept for the cache
+        mkdir -p ~/.ksptest-apt/partial
+        apt=(-o Acquire::Retries=5 -o Acquire::http::Timeout=10 -o "Dir::Cache::Archives=$HOME/.ksptest-apt" -o APT::Keep-Downloaded-Packages=true)
+        sudo apt-get "${apt[@]}" update -q
         # KSP's player under Xvfb (most already on GitHub's image: kept here in case it changes): X, software GL
         # (mesa), audio; and Mono for CKAN, only what its own package depends on (mono-devel is 170 packages)
-        sudo apt-get install -y -q --no-install-recommends \
+        sudo apt-get "${apt[@]}" install -y -q --no-install-recommends \
           xvfb xauth libgl1 libgl1-mesa-dri libglu1-mesa libegl1 \
           libxcursor1 libxrandr2 libxi6 libxinerama1 libxss1 libxext6 libx11-6 libgtk-3-0t64 \
           libpulse0 libasound2t64 libudev1 p7zip-full \
           mono-runtime ca-certificates-mono libmono-microsoft-csharp4.0-cil libmono-system-net-http-webrequest4.0-cil \
           libmono-system-servicemodel4.0a-cil libmono-system-componentmodel-composition4.0-cil
+        # the cache step saves them as the runner user
+        sudo chown -R "$USER" ~/.ksptest-apt; rm -f ~/.ksptest-apt/lock
+        echo "$(ls ~/.ksptest-apt/*.deb 2>/dev/null | wc -l) packages in the cache"
+    # saved by one job of a leg (the first shard), when it had none: the others would only fail to reserve the key
+    - name: Linux package cache, saved
+      if: runner.os == 'Linux' && steps.apt-cache.outputs.cache-hit != 'true' && (inputs.shard == '' || startsWith(inputs.shard, '1/'))
+      continue-on-error: true
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.ksptest-apt
+        key: ksptest-apt-${{ env.ImageOS }}-${{ env.ImageVersion }}-1
     - name: Download the game
       shell: bash
       env:
