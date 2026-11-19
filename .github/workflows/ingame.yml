@@ -24,9 +24,12 @@ name: In-game tests
 # when the gate action lets it: opened by someone with write access, or reviewed (its latest commit) and labelled
 # run-ingame by such a one. Let in, its code runs on runners with the game and its key, as it would after a merge.
 #
-# The jobs: a gate, a check for the game, the tests (a job per leg, each split between `shards` jobs side by side,
-# KSPTEST_SHARD), and per leg its results: summary, screenshots page and one commit status. The steps are KspTest's actions (.github/actions), which
-# a repository can also use in a workflow of its own.
+# The jobs: a gate, a check for the game (and the legs' earlier test durations, which a leg's shards deal the tests
+# by), the tests (a job per leg, each split between `shards` jobs side by side, KSPTEST_SHARD), per leg its results
+# (summary, screenshots page and one commit status) and its durations saved, and CKAN's new downloads added to the
+# download cache. The steps are KspTest's actions (.github/actions), which a repository can also use in a workflow of
+# its own. Not from a fork's pull request, nor with save-caches false: the caches (what later runs install and deal
+# their tests by) stay the repository's.
 
 on:
   workflow_call:
@@ -84,6 +87,23 @@ on:
         description: Each test job's timeout
         type: number
         default: 90
+      before:
+        description: >-
+          A bash command run in the first Windows job before its in-game tests, after the build is instrumented (unit
+          tests against the game's assemblies, say; see the run action's before): counts it writes to COV as unit*.xml
+          join the coverage report. Its failure fails that job
+        type: string
+        default: ""
+      statuses:
+        description: Each leg's result as a commit status (on a fork's pull request, its head commit; else the run's commit)
+        type: boolean
+        default: true
+      save-caches:
+        description: >-
+          Whether the run saves the legs' test durations and CKAN's new downloads for later runs (false: a build of
+          code not yet merged, say). Never from a fork's pull request
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -122,6 +142,17 @@ jobs:
           # each leg's jobs: its share of the tests, k/N ("" for all of them in one job)
           jq -nc --argjson n "$SHARDS" 'if $n > 1 then [range(1; $n + 1) | "\(.)/\($n)"] else [""] end' |
             sed 's/^/shards=/' >> "$GITHUB_OUTPUT"
+      - name: Legs
+        id: legs
+        env:
+          LEGS: ${{ inputs.legs }}
+        run: echo "list=$(jq -r 'join(" ")' <<< "$LEGS")" >> "$GITHUB_OUTPUT"
+      # each leg's earlier durations, once for all its shards (split runs only)
+      - if: steps.check.outputs.ready == 'true' && inputs.shards > 1
+        uses: chambem42/KspTest/.github/actions/durations@main
+        with:
+          mode: restore
+          legs: ${{ steps.legs.outputs.list }}
 
   # One job per leg (the legs' shards, side by side as a matrix), so each leg's report waits for its own jobs only, not
   # the other leg's. The two run the same steps (the anchor).
@@ -179,6 +210,8 @@ jobs:
           filter: ${{ inputs.filter }}
           args: ${{ inputs.test-args }}
           coverage: ${{ inputs.coverage }}
+          # the first Windows job's
+          before: ${{ runner.os == 'Windows' && (matrix.shard == '' || startsWith(matrix.shard, '1/')) && inputs.before || '' }}
 
   linux:
     needs: game
@@ -211,7 +244,7 @@ jobs:
         with:
           leg: windows
           title: ${{ inputs.title }}
-          status: ${{ inputs.title }} (Windows)
+          status: ${{ inputs.statuses && format('{0} (Windows)', inputs.title) || '' }}
 
   report-linux:
     needs: linux
@@ -224,4 +257,42 @@ jobs:
         with:
           leg: linux
           title: ${{ inputs.title }}
-          status: ${{ inputs.title }} (Linux)
+          status: ${{ inputs.statuses && format('{0} (Linux)', inputs.title) || '' }}
+
+  # this run's test durations of a leg added to those its shards dealt the tests by, for its next run
+  durations-windows:
+    needs: windows
+    if: >-
+      always() && needs.windows.result != 'skipped' && inputs.shards > 1 && inputs.save-caches &&
+      github.event_name != 'pull_request_target'
+    name: durations (windows)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: chambem42/KspTest/.github/actions/durations@main
+        with:
+          mode: save
+          leg: windows
+
+  durations-linux:
+    needs: linux
+    if: >-
+      always() && needs.linux.result != 'skipped' && inputs.shards > 1 && inputs.save-caches &&
+      github.event_name != 'pull_request_target'
+    name: durations (linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: chambem42/KspTest/.github/actions/durations@main
+        with:
+          mode: save
+          leg: linux
+
+  # the test jobs' new CKAN downloads added to the cache entry they started from (none new: nothing saved)
+  ckan-cache:
+    needs: [windows, linux]
+    if: >-
+      always() && (needs.windows.result != 'skipped' || needs.linux.result != 'skipped') && inputs.save-caches &&
+      github.event_name != 'pull_request_target'
+    name: CKAN download cache
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: chambem42/KspTest/.github/actions/ckan-cache@main

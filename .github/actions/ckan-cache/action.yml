@@ -1,0 +1,33 @@
+name: KspTest CKAN cache
+description: >-
+  The test jobs' new CKAN downloads (the run action's ckan-new-* artifacts) added to the cache entry they started from
+  (ckan-downloads-*, ci/ckan_cache.sh) and saved as the next one, trimmed to 1.5 GB, older versions first. A run that
+  downloaded nothing new saves nothing. Runs nothing of the tested code: give it a job of its own, after the tests.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache/restore@v6
+      with:
+        path: ckan-downloads
+        key: ckan-downloads-${{ github.run_id }}
+        restore-keys: ckan-downloads-
+        enableCrossOsArchive: true
+    - shell: bash
+      run: bash "$GITHUB_ACTION_PATH/../../../ci/ckan_cache.sh" snapshot
+    - uses: actions/download-artifact@v8
+      continue-on-error: true
+      with:
+        pattern: ckan-new-*
+        merge-multiple: true
+        path: ckan-downloads
+    - name: CKAN download cache entry
+      id: key
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/../../../ci/ckan_cache.sh" key
+    - uses: actions/cache/save@v6
+      if: steps.key.outputs.key != ''
+      with:
+        path: ckan-downloads
+        key: ${{ steps.key.outputs.key }}
+        enableCrossOsArchive: true

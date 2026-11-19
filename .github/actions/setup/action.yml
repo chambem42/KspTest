@@ -36,6 +36,17 @@ inputs:
   ckan-sha256:
     description: Its ckan.exe's SHA-256
     default: 7748082cdfcf2dbb5f502261b18afc85003193894c60427d04b0ac7a8dfef7de
+  ckan-cache:
+    description: >-
+      "true": CKAN's downloads from the repository's newest cache entry (ckan-downloads-*, ci/ckan_cache.sh), for this
+      setup's mods and the tests' instances; the run action uploads what it downloads new (ckan-new-NAME) for the
+      ckan-cache action to save. A failed restore leaves CKAN downloading everything
+    default: "true"
+  durations:
+    description: >-
+      "true": a shard deals the tests by the leg's earlier durations, from the run's ksptest-durations artifact (the
+      durations action's restore; without it, by count)
+    default: "true"
 
 outputs:
   game:
@@ -154,6 +165,24 @@ runs:
         mkdir -p "$(dirname "$KSPTEST_CKAN")"
         curl -fsSL -o "$KSPTEST_CKAN" "https://github.com/KSP-CKAN/CKAN/releases/download/$CKAN/ckan.exe"
         echo "$CKAN_SHA256  $KSPTEST_CKAN" | sha256sum -c -
+    # workspace paths and cross-OS archives: one entry restores on either OS
+    - name: CKAN download cache
+      if: inputs.ckan-cache == 'true'
+      continue-on-error: true
+      uses: actions/cache/restore@v6
+      with:
+        path: ckan-downloads
+        key: ckan-downloads-${{ github.run_id }}
+        restore-keys: ckan-downloads-
+        enableCrossOsArchive: true
+    - name: CKAN download cache, used
+      if: inputs.ckan-cache == 'true'
+      continue-on-error: true
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" = Windows ]; then bash "$GITHUB_ACTION_PATH/../../../ci/ckan_cache.sh" use "$KSPTEST_CKAN"
+        else bash "$GITHUB_ACTION_PATH/../../../ci/ckan_cache.sh" use mono "$KSPTEST_CKAN"; fi
+        echo "KSPTEST_CKAN_CACHE=1" >> "$GITHUB_ENV"
     - name: Mods in the game
       if: inputs.mods != ''
       shell: bash
@@ -164,6 +193,21 @@ runs:
         ckan update --gamedir "$KSPTEST_GAME" --headless
         # shellcheck disable=SC2086
         ckan install --gamedir "$KSPTEST_GAME" --headless --no-recommends $MODS
+    # the leg's test durations the durations action restored for the run: every shard of it gets the same, so each test
+    # runs in one of them
+    - uses: actions/download-artifact@v8
+      if: inputs.durations == 'true' && inputs.shard != ''
+      continue-on-error: true
+      with:
+        name: ksptest-durations
+        path: ${{ runner.temp }}/durations-all
+    - name: Durations
+      if: inputs.durations == 'true' && inputs.shard != ''
+      shell: bash
+      run: |
+        leg=$([ "$RUNNER_OS" = Windows ] && echo windows || echo linux)
+        if [ -d "$RUNNER_TEMP/durations-all/$leg" ]; then echo "KSPTEST_DURATIONS=$KSPTEST_WORK/durations-all/$leg" >> "$GITHUB_ENV"
+        else echo "no durations for $leg: the tests are dealt by count"; fi
     - name: Desktop size
       if: runner.os == 'Windows'
       continue-on-error: true

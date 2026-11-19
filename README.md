@@ -210,13 +210,17 @@ latest commit and labelled it `run-ingame`. Inputs (`.github/workflows/ingame.ym
 `shards` (jobs each leg is split between), `filter`, `test-args`, `mods` (CKAN mods installed into the game itself, to
 build against), `prepare` (a command run before the tests: staging references, say), `artifact` (a build job's output),
 `coverage` (the mod's assemblies, as built: line coverage with AltCover on Windows, `ci/coverage/`, reported in the leg's
-summary),
-`title`. The jobs: a gate, the tests, and per leg its summary, a page of its screenshots and one commit status.
+summary), `before` (a command run in the first Windows job before its tests, after instrumenting: unit tests, their
+counts joining the coverage), `statuses` (false: no commit statuses), `save-caches` (false: neither durations nor CKAN
+downloads saved, for a build of unmerged code), `title`. The jobs: a gate, the tests, per leg its summary, a page of its
+screenshots, one commit status and its test durations saved (a split leg's shards deal the tests by them), and CKAN's
+new downloads added to the download cache (`ci/ckan_cache.sh`).
 
 The steps are composite actions a workflow of its own can use too: `gate` (whether a fork's pull request may run),
-`setup` (the game, CKAN, .NET, a screen, and the `KSPTEST_*` environment: `KSPTEST_ROOT` is the action's own copy of
-KspTest, so a repository needs neither a submodule nor a checkout of it), `run` (`dotnet test` and its results
-artifact) and `report` (`ci/test_summary.py`, `ci/shots_gallery.py`, the status), each
+`setup` (the game, CKAN and its download cache, .NET, a screen, and the `KSPTEST_*` environment: `KSPTEST_ROOT` is the
+action's own copy of KspTest, so a repository needs neither a submodule nor a checkout of it), `run` (`dotnet test` and
+its results artifact), `report` (`ci/test_summary.py`, `ci/shots_gallery.py`, the status), `durations` (restore before
+a split run, save after a leg) and `ckan-cache` (the new downloads saved), each
 `chambem42/KspTest/.github/actions/<name>@main`.
 
 ## ksptest

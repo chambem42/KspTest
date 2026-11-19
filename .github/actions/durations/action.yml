@@ -1,0 +1,83 @@
+name: KspTest durations
+description: >-
+  Each leg's test durations from its earlier runs, which its shards deal the tests between them by (KSPTEST_DURATIONS,
+  set by the setup action from the ksptest-durations artifact). restore: before the test jobs, each leg's newest cache
+  entry (ksptest-durations-LEG-*) restored once and uploaded as that artifact, so every shard of the run, a rerun of a
+  failed one included, deals by the same; save: after a leg, its sessions' result.json added (the last 50 sessions'
+  kept) and saved as the leg's next entry. Workspace paths and cross-OS archives: an entry restores on either OS. Runs
+  nothing of the tested code.
+
+inputs:
+  mode:
+    description: restore (before the tests) or save (after a leg)
+    required: true
+  legs:
+    description: "restore: the legs, space separated"
+    default: windows linux
+  leg:
+    description: "save: the leg (its jobs' artifacts are ingame-results-LEG*)"
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache/restore@v6
+      if: inputs.mode == 'restore' && contains(inputs.legs, 'windows')
+      with:
+        path: durations/windows
+        key: ksptest-durations-windows-${{ github.run_id }}
+        restore-keys: ksptest-durations-windows-
+        enableCrossOsArchive: true
+    - uses: actions/cache/restore@v6
+      if: inputs.mode == 'restore' && contains(inputs.legs, 'linux')
+      with:
+        path: durations/linux
+        key: ksptest-durations-linux-${{ github.run_id }}
+        restore-keys: ksptest-durations-linux-
+        enableCrossOsArchive: true
+    - name: Durations so far
+      if: inputs.mode == 'restore'
+      shell: bash
+      env:
+        LEGS: ${{ inputs.legs }}
+      run: |
+        for leg in $LEGS; do mkdir -p "durations/$leg"; echo "$leg: $(ls "durations/$leg" | wc -l) sessions"; done
+    - uses: actions/upload-artifact@v6
+      if: inputs.mode == 'restore'
+      with:
+        name: ksptest-durations
+        path: durations
+        include-hidden-files: true
+        if-no-files-found: ignore
+
+    - uses: actions/download-artifact@v8
+      if: inputs.mode == 'save'
+      continue-on-error: true
+      with:
+        name: ksptest-durations
+        path: durations
+    - uses: actions/download-artifact@v8
+      if: inputs.mode == 'save'
+      with:
+        pattern: ingame-results-${{ inputs.leg }}*
+        merge-multiple: true
+        path: ${{ runner.temp }}/new
+    - name: Durations
+      if: inputs.mode == 'save'
+      shell: bash
+      env:
+        LEG: ${{ inputs.leg }}
+      run: |
+        d="durations/$LEG"; mkdir -p "$d"
+        for f in "$RUNNER_TEMP"/new/results/*/result.json; do
+          [ -f "$f" ] || continue
+          s="$d/$(basename "$(dirname "$f")")"; mkdir -p "$s"; cp "$f" "$s/"
+        done
+        ls -1d "$d"/*/ 2>/dev/null | sort | head -n -50 | xargs -r rm -rf
+        echo "$(ls -1d "$d"/*/ 2>/dev/null | wc -l) sessions' durations kept"
+    - uses: actions/cache/save@v6
+      if: inputs.mode == 'save'
+      with:
+        path: durations/${{ inputs.leg }}
+        key: ksptest-durations-${{ inputs.leg }}-${{ github.run_id }}-${{ github.run_attempt }}
+        enableCrossOsArchive: true
