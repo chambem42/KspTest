@@ -60,7 +60,7 @@ runs:
             refuse "@$SENDER labelled it $LABEL, but only someone with write access starts the tests."
           # the labeller's own review of this very commit: what they read is what runs (a review records its commit)
           elif [ -z "$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" \
-                      --jq '.[] | select(.user.login == env.SENDER and .commit_id == env.SHA and .state != "PENDING") | .id')" ]; then
+                      --jq '.[] | select(.user.login == env.SENDER and .commit_id == env.SHA and .state != "PENDING" and .state != "DISMISSED") | .id')" ]; then
             refuse "no review by @$SENDER of the latest commit ${SHA::7}. Submit a review of it (a comment is enough), then label it $LABEL again."
           else
             run=true; echo "reviewed and labelled by $SENDER: running $SHA"
