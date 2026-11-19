@@ -81,11 +81,18 @@ runs:
       if: runner.os == 'Linux'
       shell: bash
       run: |
+        # unpacking is most of an install's time on a runner: no fsync per file, no man page index
+        echo force-unsafe-io | sudo tee /etc/dpkg/dpkg.cfg.d/ksptest-unsafe-io >/dev/null
+        sudo rm -f /var/lib/man-db/auto-update
         sudo apt-get update -q
+        # KSP's player under Xvfb (most already on GitHub's image: kept here in case it changes): X, software GL
+        # (mesa), audio; and Mono for CKAN, only what its own package depends on (mono-devel is 170 packages)
         sudo apt-get install -y -q --no-install-recommends \
-          xvfb xauth x11-utils libgl1 libgl1-mesa-dri libglu1-mesa libegl1 \
-          libxcursor1 libxrandr2 libxi6 libxinerama1 libxss1 libxext6 libx11-6 libgtk-3-0 \
-          libpulse0 libasound2t64 libudev1 mono-runtime mono-devel ca-certificates-mono p7zip-full
+          xvfb xauth libgl1 libgl1-mesa-dri libglu1-mesa libegl1 \
+          libxcursor1 libxrandr2 libxi6 libxinerama1 libxss1 libxext6 libx11-6 libgtk-3-0t64 \
+          libpulse0 libasound2t64 libudev1 p7zip-full \
+          mono-runtime ca-certificates-mono libmono-microsoft-csharp4.0-cil libmono-system-net-http-webrequest4.0-cil \
+          libmono-system-servicemodel4.0a-cil libmono-system-componentmodel-composition4.0-cil
     - name: Download the game
       shell: bash
       env:
@@ -132,5 +139,6 @@ runs:
       shell: bash
       run: |
         Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >"$KSPTEST_WORK/xvfb.log" 2>&1 &
-        for i in $(seq 50); do xdpyinfo -display :99 >/dev/null 2>&1 && break; sleep 0.2; done
+        # up once its socket is
+        for i in $(seq 50); do [ -S /tmp/.X11-unix/X99 ] && break; sleep 0.2; done
         echo "DISPLAY=:99" >> "$GITHUB_ENV"
