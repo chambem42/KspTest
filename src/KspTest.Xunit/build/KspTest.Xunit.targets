@@ -60,15 +60,20 @@
          <KspMod Include="FerramAerospaceResearchContinued;KSPBurst" />     CKAN identifiers ("Id" or "Id=version")
          <KspMod Include="../StandInEngines/GameData/StandInEngines" />    a local mod: its GameData/ModName folder
          <KspOverlay Include="../GameData/FerramAerospaceResearch" />       the same, for a mod built from source over CKAN's copy
-       the CKAN identifiers written to ksptest-mods.txt and the local mods (full paths) to ksptest-overlays.txt beside the
-       tests (always, so removing one takes effect) -->
+         <KspMod Include="https://github.com/owner/repo@commit/GameData/ModName?build=Project.csproj&amp;over" />
+                                                                            a mod from a git repository at a commit (RepoMod)
+       the CKAN identifiers written to ksptest-mods.txt and the local mods (full paths, or a repository's as given) to
+       ksptest-overlays.txt beside the tests (always, so removing one takes effect) -->
   <Target Name="KspTestWriteInstanceItems" AfterTargets="Build">
     <ItemGroup>
       <_KspCkanMod Include="@(KspMod)"
                    Condition="!$([System.String]::Copy('%(KspMod.Identity)').Contains('/')) And !$([System.String]::Copy('%(KspMod.Identity)').Contains('\'))" />
+      <!-- a repository's (a URL: "://") as given; a folder's as its full path -->
       <_KspLocalMod Include="@(KspMod->'%(FullPath)')"
-                    Condition="$([System.String]::Copy('%(KspMod.Identity)').Contains('/')) Or $([System.String]::Copy('%(KspMod.Identity)').Contains('\'))" />
-      <_KspLocalMod Include="@(KspOverlay->'%(FullPath)')" />
+                    Condition="($([System.String]::Copy('%(KspMod.Identity)').Contains('/')) Or $([System.String]::Copy('%(KspMod.Identity)').Contains('\'))) And !$([System.String]::Copy('%(KspMod.Identity)').Contains('://'))" />
+      <_KspLocalMod Include="@(KspMod)" Condition="$([System.String]::Copy('%(KspMod.Identity)').Contains('://'))" />
+      <_KspLocalMod Include="@(KspOverlay->'%(FullPath)')" Condition="!$([System.String]::Copy('%(KspOverlay.Identity)').Contains('://'))" />
+      <_KspLocalMod Include="@(KspOverlay)" Condition="$([System.String]::Copy('%(KspOverlay.Identity)').Contains('://'))" />
     </ItemGroup>
     <WriteLinesToFile File="$(OutDir)ksptest-mods.txt" Lines="@(_KspCkanMod)" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(OutDir)ksptest-overlays.txt" Lines="@(_KspLocalMod)" Overwrite="true" WriteOnlyWhenDifferent="true" />

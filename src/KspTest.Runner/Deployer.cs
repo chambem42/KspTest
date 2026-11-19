@@ -176,7 +176,7 @@ namespace KspTest.Runner
             {
                 // (one from a repository built first, against this install, if it has not been)
                 RepoMod.EnsureBuilt(f, install, log);
-                Overlay(install, f, log);
+                Overlay(install, RepoMod.Staged(f, install, log), log);
             }
             File.WriteAllLines(record, names);
         }
@@ -202,7 +202,7 @@ namespace KspTest.Runner
             log($"overlay GameData/{name} <- {source}" + (copied + removed > 0 ? $" ({copied} copied, {removed} removed)" : " (unchanged)"));
         }
 
-        private static void Mirror(string from, string to, ref int copied, ref int removed)
+        internal static void Mirror(string from, string to, ref int copied, ref int removed)
         {
             Directory.CreateDirectory(to);
             var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -237,7 +237,7 @@ namespace KspTest.Runner
             }
         }
 
-        private static void CopyDir(string from, string to)
+        internal static void CopyDir(string from, string to)
         {
             Directory.CreateDirectory(to);
             foreach (string f in Directory.GetFiles(from))
