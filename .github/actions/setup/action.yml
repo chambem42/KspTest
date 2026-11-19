@@ -79,14 +79,24 @@ runs:
         echo "KspTest: $root ($(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo 'its tarball'))"
     # the packages' .deb files from earlier runs on this runner image: an Ubuntu mirror can crawl (one run took 10
     # minutes for 25 MB), the install itself takes seconds
+    # keyed by the runner image: ImageOS/ImageVersion are the runner's environment, not the env context (the release and
+    # the month stand in where they are missing)
+    - id: apt-key
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        . /etc/os-release
+        os="${ImageOS:-$ID$VERSION_ID}"
+        echo "prefix=ksptest-apt-$os-" >> "$GITHUB_OUTPUT"
+        echo "key=ksptest-apt-$os-${ImageVersion:-$(date +%Y%m)}-1" >> "$GITHUB_OUTPUT"
     - name: Linux package cache
       id: apt-cache
       if: runner.os == 'Linux'
       uses: actions/cache/restore@v6
       with:
         path: ~/.ksptest-apt
-        key: ksptest-apt-${{ env.ImageOS }}-${{ env.ImageVersion }}-1
-        restore-keys: ksptest-apt-${{ env.ImageOS }}-
+        key: ${{ steps.apt-key.outputs.key }}
+        restore-keys: ${{ steps.apt-key.outputs.prefix }}
     - name: Linux packages
       if: runner.os == 'Linux'
       shell: bash
@@ -106,7 +116,8 @@ runs:
           libpulse0 libasound2t64 libudev1 p7zip-full \
           mono-runtime ca-certificates-mono libmono-microsoft-csharp4.0-cil libmono-system-net-http-webrequest4.0-cil \
           libmono-system-servicemodel4.0a-cil libmono-system-componentmodel-composition4.0-cil
-        # the cache step saves them as the runner user
+        # the cache step saves them as the runner user, without versions the mirror no longer has (an older image's)
+        sudo apt-get "${apt[@]}" autoclean -q
         sudo chown -R "$USER" ~/.ksptest-apt; rm -f ~/.ksptest-apt/lock
         echo "$(ls ~/.ksptest-apt/*.deb 2>/dev/null | wc -l) packages in the cache"
     # saved by one job of a leg (the first shard), when it had none: the others would only fail to reserve the key
@@ -116,7 +127,7 @@ runs:
       uses: actions/cache/save@v6
       with:
         path: ~/.ksptest-apt
-        key: ksptest-apt-${{ env.ImageOS }}-${{ env.ImageVersion }}-1
+        key: ${{ steps.apt-key.outputs.key }}
     - name: Download the game
       shell: bash
       env:
