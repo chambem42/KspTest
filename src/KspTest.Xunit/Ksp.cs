@@ -192,12 +192,19 @@ namespace KspTest.Xunit
                     output.WriteLine(t.Report().TrimEnd());
                 }
 
-                string others = string.Join(", ", batch.Requests.Where(q => q != request).Select(q => q.Test));
-                output.WriteLine(r == null
-                    ? $"in one KSP session with {others}, still running"
-                    : $"in one KSP session with {others}: {r.Status} ({r.DurationSec}s, ended in {r.Scene})" +
-                      (r.Exceptions.Count > 0 ? $"; {r.Exceptions.Count} exceptions in KSP.log (first: {r.Exceptions[0]})" : ""));
-                output.WriteLine($"  results: {batch.ResultsDir}");
+                // the session it shared, for a test that failed or did not run only: how the session went may be why
+                // (a passing test's would be one line per test of the session, which the progress lines already give).
+                // The others by name only when few (the results folder has them)
+                if (t == null || !t.Passed && t.Status != "skipped")
+                {
+                    List<string> others = batch.Requests.Where(q => q != request).Select(q => ShortName(q.Test)).ToList();
+                    string with = others.Count <= 3 ? $"with {string.Join(", ", others)}" : $"with {others.Count} other tests";
+                    output.WriteLine(r == null
+                        ? $"in one KSP session {with}, still running"
+                        : $"in one KSP session {with}: {r.Status} ({r.DurationSec}s, ended in {r.Scene})" +
+                          (r.Exceptions.Count > 0 ? $"; {r.Exceptions.Count} exceptions in KSP.log (first: {r.Exceptions[0]})" : ""));
+                    output.WriteLine($"  results: {batch.ResultsDir}");
+                }
             }
 
             if (t == null)
