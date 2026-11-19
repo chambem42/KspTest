@@ -129,9 +129,20 @@ A mod can also come from a git repository at a commit: `https://github.com/owner
 `?build=Source/Project.csproj` if its plugin is built rather than committed. The repository is cloned once into
 `sources` beside the instances folder (`KSPTEST_SOURCES` moves it), checked out at the commit, and its
 `GameData/ModName` is a local mod like any other, counted by its folder's name (the same instance as a local copy of
-it). The project is built (`dotnet build -c Release`) before the first run that needs it, against that run's
-instance: its `Managed` assemblies and every DLL in its GameData, flat in one folder passed as `RefsDir`,
-`ReferencePath` and `KSPRoot`. Pinned to a commit, a run has the same mod on every machine, CI included.
+it). The project is built before the first run that needs it, against that run's instance: its `Managed` assemblies
+and every DLL in its GameData, flat in one folder passed as `RefsDir`, `ReferencePath` and `KSPRoot`. An SDK-style
+project builds with `dotnet build -c Release`; a solution, a solution filter or an older project (`packages.config`
+and all) with MSBuild (`-restore -p:RestorePackagesConfig=true`, as such a mod's own CI builds it): Visual Studio's,
+found by vswhere, or `KSPTEST_MSBUILD`, or `msbuild` on the path (Mono's, on Linux). Add `&over` (in a project file,
+`&amp;over`) to lay the folder over the copy CKAN installed rather than replace it: the repository's files in the
+folder and the DLLs the build put there go on top, the rest of CKAN's copy stays (a release can ship files its
+repository doesn't have, as RP-1's does), so list the mod's CKAN identifier too. Pinned to a commit, a run has the same
+mod on every machine, CI included.
+
+```xml
+<KspMod Include="RP-1" />
+<KspMod Include="https://github.com/KSP-RO/RP-1@5ac1f84/GameData/RP-1?build=Source/RP0-CI.slnf&amp;over" />
+```
 
 A test adds its own with `[UITest(Mods = "MechJeb2")]`, and `mods` in `ksptest.json` (`KSPTEST_MODS`) adds to every
 run, CKAN identifiers or paths alike. Each distinct set of mods is its own instance, a local mod counting by its folder
@@ -171,6 +182,40 @@ It gives an in-game project the harness and the named modules, and a `dotnet tes
 runner and the harness it deploys, as the packages would. On an install without MechJeb or RP-1, an in-game project
 that needs one builds empty and a `KspRequires` reference to it is left out, so the tests build on any install and
 those skip. FAR's `KspTests/` uses it (with `KSPTEST_ROOT` pointing at another checkout to work on both at once).
+
+### On GitHub's runners
+
+A repository runs its in-game tests in CI with one job calling KspTest's reusable workflow:
+
+```yaml
+on:
+  push:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+jobs:
+  ingame:
+    uses: chambem42/KspTest/.github/workflows/ingame.yml@main
+    permissions: { contents: read, pull-requests: write, statuses: write }
+    secrets: inherit
+    with:
+      test-project: KspTests/MyMod.KspTests.Run
+```
+
+The game is stock KSP from encrypted 7z volumes in a private repository's release (`ci/Pack-KspGame.ps1` makes them),
+given by the repository's environment `ksp-game`: the secrets `KSP_GAME_KEY` (the archive key) and `KSP_GAME_TOKEN`
+(fine-grained, Contents: read-only on the game repository alone) and the variable `KSP_GAME_REPO`. Without it the
+in-game jobs are skipped with a notice. A fork's pull request runs only once someone with write access has reviewed its
+latest commit and labelled it `run-ingame`. Inputs (`.github/workflows/ingame.yml`): `legs` (`["windows", "linux"]`),
+`shards` (jobs each leg is split between), `filter`, `test-args`, `mods` (CKAN mods installed into the game itself, to
+build against), `prepare` (a command run before the tests: staging references, say), `artifact` (a build job's output),
+`title`. The jobs: a gate, the tests, and per leg its summary, a page of its screenshots and one commit status.
+
+The steps are composite actions a workflow of its own can use too: `gate` (whether a fork's pull request may run),
+`setup` (the game, CKAN, .NET, a screen, and the `KSPTEST_*` environment: `KSPTEST_ROOT` is the action's own copy of
+KspTest, so a repository needs neither a submodule nor a checkout of it), `run` (`dotnet test` and its results
+artifact) and `report` (`ci/test_summary.py`, `ci/shots_gallery.py`, the status), each
+`chambem42/KspTest/.github/actions/<name>@main`.
 
 ## ksptest
 

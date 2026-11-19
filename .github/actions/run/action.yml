@@ -1,0 +1,64 @@
+name: KspTest run
+description: >-
+  A test project's in-game tests (dotnet test, after the setup action), built against the game and KspTest as setup
+  left them (KspDir, KspTestRoot). Its results, logs and TRX are uploaded as ingame-results-NAME, with a crashed KSP's
+  Player.log and crash folder: never the game or an instance. Fails when a test does.
+
+inputs:
+  project:
+    description: The test project to run (a KspTest .Run project), from the repository root
+    required: true
+  name:
+    description: "This job's name in its artifacts (ingame-results-NAME): the leg, and its shard if split"
+    required: true
+  filter:
+    description: dotnet test --filter (default all but the Explicit tests)
+    default: ""
+  args:
+    description: More dotnet test arguments (-p:Name=Value and the like), space separated
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: In-game tests
+      shell: bash
+      env:
+        PROJECT: ${{ inputs.project }}
+        NAME: ${{ inputs.name }}
+        FILTER: ${{ inputs.filter }}
+        ARGS: ${{ inputs.args }}
+      run: |
+        set -o pipefail
+        # shellcheck disable=SC2206
+        args=(test "$PROJECT" -p:KspDir="$KSPTEST_GAME" -p:KspTestRoot="$KSPTEST_ROOT" $ARGS
+              --logger "console;verbosity=normal" --logger "trx;LogFileName=ingame-$NAME.trx" --results-directory "$KSPTEST_WORK/trx")
+        [ -n "$FILTER" ] && args+=(--filter "$FILTER")
+        # without xUnit's "[xUnit.net 0:00:12.34] Assembly: " before each line: KspTest's lines carry their own stamp
+        dotnet "${args[@]}" 2>&1 | sed -u -E 's/^\[xUnit\.net [0-9:.]+\] ([^ :]+: )?//'
+    # a crashed KSP leaves its native stack in Unity's Player.log and the crash folder, outside the results
+    - name: Crash reports
+      if: failure()
+      shell: bash
+      env:
+        NAME: ${{ inputs.name }}
+      run: |
+        d="$KSPTEST_WORK/crash/$NAME"; mkdir -p "$d"
+        if [ "$RUNNER_OS" = Windows ]; then
+          p="$(cygpath -u "$USERPROFILE")/AppData/LocalLow/Squad/Kerbal Space Program"
+          c="$(cygpath -u "$LOCALAPPDATA")/Temp/Squad/Kerbal Space Program/Crashes"
+        else
+          p="$HOME/.config/unity3d/Squad/Kerbal Space Program"; c=""
+        fi
+        cp "$p"/Player*.log "$d/" 2>/dev/null || echo "no Player.log in $p"
+        if [ -n "$c" ] && [ -d "$c" ]; then cp -r "$c" "$d/"; fi
+    - uses: actions/upload-artifact@v6
+      if: always()
+      with:
+        name: ingame-results-${{ inputs.name }}
+        path: |
+          ${{ runner.temp }}/results
+          ${{ runner.temp }}/trx
+          ${{ runner.temp }}/crash
+          !${{ runner.temp }}/results/*/collected
+        if-no-files-found: warn

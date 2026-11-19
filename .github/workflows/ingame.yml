@@ -1,0 +1,189 @@
+name: In-game tests
+
+# A repository's KspTest in-game tests on GitHub's runners, as one job in its own workflow:
+#
+#   on:
+#     push:
+#     pull_request_target:
+#       types: [opened, synchronize, reopened, labeled]
+#     workflow_dispatch:
+#   jobs:
+#     ingame:
+#       uses: chambem42/KspTest/.github/workflows/ingame.yml@main
+#       permissions: { contents: read, pull-requests: write, statuses: write }
+#       secrets: inherit
+#       with:
+#         test-project: KspTests/MyMod.KspTests.Run
+#
+# KSP comes from encrypted 7z volumes in a private repository's release (ci/Pack-KspGame.ps1), through the calling
+# repository's environment ksp-game: its secrets KSP_GAME_KEY (the archive key) and KSP_GAME_TOKEN (fine-grained,
+# Contents: read-only on the game repository alone) and its variable KSP_GAME_REPO (owner/name). Without the variable
+# the in-game jobs are skipped with a notice, not failed (a fork running its own pushes, say).
+#
+# A fork's pull request (pull_request_target: the workflow is the default branch's, the code the PR's head) runs only
+# when the gate action lets it: opened by someone with write access, or reviewed (its latest commit) and labelled
+# run-ingame by such a one. Let in, its code runs on runners with the game and its key, as it would after a merge.
+#
+# The jobs: a gate, a check for the game, the tests (each leg split between `shards` jobs, KSPTEST_SHARD), and per leg
+# its results: summary, screenshots page and one commit status. The steps are KspTest's actions (.github/actions), which
+# a repository can also use in a workflow of its own.
+
+on:
+  workflow_call:
+    inputs:
+      test-project:
+        description: The KspTest .Run test project, from the repository root
+        type: string
+        required: true
+      title:
+        description: The results' title (summary, page) and their commit status's name, with the leg
+        type: string
+        default: In-game tests
+      legs:
+        description: The platforms, a JSON array of windows and linux
+        type: string
+        default: '["windows"]'
+      shards:
+        description: Jobs each leg's tests are split between
+        type: number
+        default: 1
+      filter:
+        description: dotnet test --filter (default all but the Explicit tests)
+        type: string
+        default: ""
+      test-args:
+        description: More dotnet test arguments, space separated
+        type: string
+        default: ""
+      mods:
+        description: CKAN identifiers installed into the game itself (what the test project builds against), space separated
+        type: string
+        default: ""
+      prepare:
+        description: >-
+          A bash command run in the repository before the tests, with the game set up (KSPTEST_GAME, KSPTEST_ROOT): to
+          stage references, say
+        type: string
+        default: ""
+      artifact:
+        description: An artifact of the calling run downloaded before the tests (a build job's output, say)
+        type: string
+        default: ""
+      artifact-path:
+        description: Where the artifact goes, from the repository root
+        type: string
+        default: ""
+      timeout-minutes:
+        description: Each test job's timeout
+        type: number
+        default: 90
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - id: gate
+        uses: chambem42/KspTest/.github/actions/gate@main
+
+  # whether the repository has the game set up (the environment ksp-game and its KSP_GAME_REPO), and the test jobs
+  game:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    environment:
+      name: ksp-game
+      deployment: false
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+      jobs: ${{ steps.check.outputs.jobs }}
+    steps:
+      - id: check
+        env:
+          GAME_REPO: ${{ vars.KSP_GAME_REPO }}
+          LEGS: ${{ inputs.legs }}
+          SHARDS: ${{ inputs.shards }}
+        run: |
+          if [ -n "$GAME_REPO" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::no game set up (the environment ksp-game's KSP_GAME_REPO): the in-game tests are skipped"; fi
+          jq -nc --argjson legs "$LEGS" --argjson n "$SHARDS" '[ $legs[] as $l | range(1; $n + 1) as $k | {
+              leg: $l,
+              name: (if $n > 1 then "\($l)-\($k)" else $l end),
+              shard: (if $n > 1 then "\($k)/\($n)" else "" end),
+              os: (if $l == "windows" then "windows-2022" else "ubuntu-24.04" end) } ]' |
+            sed 's/^/jobs=/' >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: game
+    if: needs.game.outputs.ready == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.game.outputs.jobs) }}
+    name: in-game (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # the secrets (the caller's environment); not a deployment: the environment only holds them
+    environment:
+      name: ksp-game
+      deployment: false
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # a fork's pull request (pull_request_target): its head as the event saw it, which the gate let in
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: chambem42/KspTest/.github/actions/setup@main
+        with:
+          game-repo: ${{ vars.KSP_GAME_REPO }}
+          game-token: ${{ secrets.KSP_GAME_TOKEN }}
+          game-key: ${{ secrets.KSP_GAME_KEY }}
+          shard: ${{ matrix.shard }}
+          mods: ${{ inputs.mods }}
+      - uses: actions/download-artifact@v8
+        if: inputs.artifact != ''
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ inputs.artifact-path }}
+      - name: Prepare
+        if: inputs.prepare != ''
+        env:
+          PREPARE: ${{ inputs.prepare }}
+        run: eval "$PREPARE"
+      - uses: chambem42/KspTest/.github/actions/run@main
+        with:
+          project: ${{ inputs.test-project }}
+          name: ${{ matrix.name }}
+          filter: ${{ inputs.filter }}
+          args: ${{ inputs.test-args }}
+
+  report:
+    needs: test
+    if: always() && needs.test.result != 'skipped'
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: ${{ fromJSON(inputs.legs) }}
+    name: report (${{ matrix.leg }})
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: chambem42/KspTest/.github/actions/report@main
+        with:
+          leg: ${{ matrix.leg }}
+          title: ${{ inputs.title }}
+          status: ${{ inputs.title }} (${{ matrix.leg }})

@@ -1,0 +1,136 @@
+name: KspTest setup
+description: >-
+  A runner made ready for KspTest's in-game tests: KSP from a private repository's release (encrypted 7z volumes made
+  by ci/Pack-KspGame.ps1), CKAN (pinned), .NET, a screen for batchmode KSP, and the KSPTEST_* environment that runs
+  the tests in instances made from that game (batchmode, low-res textures). KspTest itself is this action's own
+  repository at the ref the caller pinned (KSPTEST_ROOT, which a test project's KspTestRoot can take): no submodule or
+  second checkout. The game folder is never cached or uploaded.
+
+inputs:
+  game-repo:
+    description: The private repository (owner/name) whose release holds the game (vars.KSP_GAME_REPO)
+    required: true
+  game-token:
+    description: A token that may read that repository's releases (secrets.KSP_GAME_TOKEN)
+    required: true
+  game-key:
+    description: The archive's key (secrets.KSP_GAME_KEY)
+    required: true
+  game-release:
+    description: The release's name, without the platform (ksp-1.12.5 -> ksp-1.12.5-windows)
+    default: ksp-1.12.5
+  window:
+    description: The game's window, and so the screenshots, WIDTHxHEIGHT (Linux batchmode draws 640x480 whatever is asked)
+    default: ""
+  shard:
+    description: This job's share of the tests, k/N (KSPTEST_SHARD); empty for all
+    default: ""
+  mods:
+    description: >-
+      CKAN identifiers installed into the game itself, space separated: what a test project builds against (the tests'
+      instances get theirs from the project, as ever)
+    default: ""
+  ckan-version:
+    description: The CKAN release to use
+    default: v1.36.4
+  ckan-sha256:
+    description: Its ckan.exe's SHA-256
+    default: 7748082cdfcf2dbb5f502261b18afc85003193894c60427d04b0ac7a8dfef7de
+
+outputs:
+  game:
+    description: The game folder (also KSPTEST_GAME)
+    value: ${{ steps.paths.outputs.game }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 8.x
+    - id: paths
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        WINDOW: ${{ inputs.window }}
+        SHARD: ${{ inputs.shard }}
+      run: |
+        w="$RUNNER_TEMP"; root="$(cd "$ACTION_PATH/../../.." && pwd)"
+        if command -v cygpath >/dev/null; then w=$(cygpath -m "$w"); root=$(cygpath -m "$root"); fi
+        if [ -z "$WINDOW" ]; then
+          if [ "$RUNNER_OS" = Windows ]; then WINDOW=1920x1080; else WINDOW=1280x960; fi
+        fi
+        {
+          echo "KSPTEST_WORK=$w"
+          echo "KSPTEST_ROOT=$root"
+          echo "KSPTEST_GAME=$w/ksp"
+          echo "KSPTEST_INSTANCES=$w/instances"
+          echo "KSPTEST_RESULTS=$w/results"
+          echo "KSPTEST_CKAN=$w/ckan/ckan.exe"
+          echo "KSPTEST_KSP_ARGS=-batchmode"
+          echo "KSPTEST_TEXTURES=low"
+          echo "KSPTEST_WINDOW=$WINDOW"
+          echo "KSPTEST_MAX_KSPS=1"
+          [ -n "$SHARD" ] && echo "KSPTEST_SHARD=$SHARD"
+          echo "DOTNET_CLI_TELEMETRY_OPTOUT=1"
+          echo "DOTNET_NOLOGO=1"
+        } >> "$GITHUB_ENV"
+        echo "game=$w/ksp" >> "$GITHUB_OUTPUT"
+        echo "KspTest: $root ($(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo 'its tarball'))"
+    - name: Linux packages
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y -q --no-install-recommends \
+          xvfb xauth x11-utils libgl1 libgl1-mesa-dri libglu1-mesa libegl1 \
+          libxcursor1 libxrandr2 libxi6 libxinerama1 libxss1 libxext6 libx11-6 libgtk-3-0 \
+          libpulse0 libasound2t64 libudev1 mono-runtime mono-devel ca-certificates-mono p7zip-full
+    - name: Download the game
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.game-token }}
+        GAME_REPO: ${{ inputs.game-repo }}
+        RELEASE: ${{ inputs.game-release }}-${{ runner.os == 'Windows' && 'windows' || 'linux' }}
+      run: gh release download "$RELEASE" -R "$GAME_REPO" -p '*.7z.*' -D "$KSPTEST_WORK/game-archive"
+    - name: Extract the game
+      shell: bash
+      env:
+        KSP_GAME_KEY: ${{ inputs.game-key }}
+        RELEASE: ${{ inputs.game-release }}-${{ runner.os == 'Windows' && 'windows' || 'linux' }}
+      run: |
+        7z x -y -bso0 -bsp0 "-p$KSP_GAME_KEY" "-o$KSPTEST_GAME" "$KSPTEST_WORK/game-archive/$RELEASE.7z.001"
+        rm -rf "$KSPTEST_WORK/game-archive"
+        if [ -f "$KSPTEST_GAME/KSP.x86_64" ]; then chmod +x "$KSPTEST_GAME/KSP.x86_64"; fi
+    # a release pinned and checked: a new CKAN cannot change a run overnight
+    - name: CKAN
+      shell: bash
+      env:
+        CKAN: ${{ inputs.ckan-version }}
+        CKAN_SHA256: ${{ inputs.ckan-sha256 }}
+      run: |
+        mkdir -p "$(dirname "$KSPTEST_CKAN")"
+        curl -fsSL -o "$KSPTEST_CKAN" "https://github.com/KSP-CKAN/CKAN/releases/download/$CKAN/ckan.exe"
+        echo "$CKAN_SHA256  $KSPTEST_CKAN" | sha256sum -c -
+    - name: Mods in the game
+      if: inputs.mods != ''
+      shell: bash
+      env:
+        MODS: ${{ inputs.mods }}
+      run: |
+        ckan() { if [ "$RUNNER_OS" = Windows ]; then "$KSPTEST_CKAN" "$@"; else mono "$KSPTEST_CKAN" "$@"; fi; }
+        ckan update --gamedir "$KSPTEST_GAME" --headless
+        # shellcheck disable=SC2086
+        ckan install --gamedir "$KSPTEST_GAME" --headless --no-recommends $MODS
+    - name: Desktop size
+      if: runner.os == 'Windows'
+      continue-on-error: true
+      shell: pwsh
+      run: '& "$env:GITHUB_ACTION_PATH/../../../ci/desktop-size.ps1" -Window $env:KSPTEST_WINDOW'
+    - name: Virtual display
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >"$KSPTEST_WORK/xvfb.log" 2>&1 &
+        for i in $(seq 50); do xdpyinfo -display :99 >/dev/null 2>&1 && break; sleep 0.2; done
+        echo "DISPLAY=:99" >> "$GITHUB_ENV"

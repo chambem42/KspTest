@@ -1,0 +1,73 @@
+name: KspTest gate
+description: >-
+  Whether a run may run the code it checks out on runners with the game and its key. Anything but a pull request from a
+  fork (on pull_request_target): yes. A fork's pull request: yes when opened by someone with write access; else only
+  when someone with write access, having submitted a review of its latest commit (a comment is enough), labels it (the
+  label is taken off at once, and a push between the review and the label runs nothing). Checks out and runs nothing of
+  the pull request.
+
+inputs:
+  label:
+    description: The label that lets a reviewed fork's pull request run
+    default: run-ingame
+  token:
+    description: A token that may read the repository's collaborators and comment on and unlabel its pull requests
+    default: ${{ github.token }}
+
+outputs:
+  run:
+    description: '"true" when the run may run the code'
+    value: ${{ steps.decide.outputs.run }}
+
+runs:
+  using: composite
+  steps:
+    - id: decide
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        LABEL: ${{ inputs.label }}
+        EVENT: ${{ github.event_name }}
+        REPO: ${{ github.repository }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        PR: ${{ github.event.pull_request.number }}
+        ACTION: ${{ github.event.action }}
+        LABELLED: ${{ github.event.label.name }}
+        SENDER: ${{ github.event.sender.login }}
+        AUTHOR: ${{ github.event.pull_request.user.login }}
+        SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        if [ "$EVENT" != pull_request_target ] || [ "$HEAD_REPO" = "$REPO" ]; then
+          echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+        fi
+        writer() {
+          case "$(gh api "repos/$REPO/collaborators/$1/permission" --jq .permission 2>/dev/null || echo none)" in
+            admin|maintain|write) return 0 ;;
+            *) return 1 ;;
+          esac
+        }
+        refuse() {
+          echo "::warning::$1"
+          gh api "repos/$REPO/issues/$PR/comments" -f body="In-game tests not started: $1" --silent ||
+            echo "::warning::could not comment on the pull request"
+        }
+        run=false
+        if [ "$ACTION" = labeled ]; then
+          if [ "$LABELLED" != "$LABEL" ]; then echo "run=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # spent: the label starts this run only; the next needs it again
+          gh api -X DELETE "repos/$REPO/issues/$PR/labels/$LABEL" --silent || echo "::warning::could not take the $LABEL label off"
+          if ! writer "$SENDER"; then
+            refuse "@$SENDER labelled it $LABEL, but only someone with write access starts the tests."
+          # the labeller's own review of this very commit: what they read is what runs (a review records its commit)
+          elif [ -z "$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" \
+                      --jq '.[] | select(.user.login == env.SENDER and .commit_id == env.SHA and .state != "PENDING") | .id')" ]; then
+            refuse "no review by @$SENDER of the latest commit ${SHA::7}. Submit a review of it (a comment is enough), then label it $LABEL again."
+          else
+            run=true; echo "reviewed and labelled by $SENDER: running $SHA"
+          fi
+        elif writer "$AUTHOR"; then
+          run=true; echo "opened by $AUTHOR, who has write access: running $SHA"
+        else
+          echo "::notice::the in-game tests of $AUTHOR's pull request wait for a maintainer's review and $LABEL label"
+        fi
+        echo "run=$run" >> "$GITHUB_OUTPUT"

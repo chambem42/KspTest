@@ -1,0 +1,85 @@
+name: KspTest report
+description: >-
+  One leg's in-game results (its jobs' ingame-results-LEG* artifacts, merged): the job summary (ci/test_summary.py), a
+  page of its screenshots uploaded unzipped so it opens as one file (ci/shots_gallery.py), and the leg as one commit
+  status counting its tests ("412 passed, 2 failed, 31 skipped"). Fails when a test failed or ran in none of the jobs.
+  Runs nothing of the tested code: give it a job of its own.
+
+inputs:
+  leg:
+    description: The leg (its jobs' artifacts are ingame-results-LEG*)
+    required: true
+  title:
+    description: The page's and the summary's title
+    default: In-game tests
+  status:
+    description: The commit status's name (context); empty for none
+    default: ""
+  token:
+    description: A token with statuses write, for the status
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v8
+      continue-on-error: true
+      with:
+        pattern: ingame-results-${{ inputs.leg }}*
+        merge-multiple: true
+        path: ${{ runner.temp }}/results-${{ inputs.leg }}
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+    - name: Screenshots page
+      shell: bash
+      env:
+        LEG: ${{ inputs.leg }}
+        TITLE: ${{ inputs.title }}
+      run: |
+        python -m pip install --quiet --disable-pip-version-check pillow || echo "no Pillow: the page embeds the PNGs"
+        python "$GITHUB_ACTION_PATH/../../../ci/shots_gallery.py" "$RUNNER_TEMP/results-$LEG/results" \
+          "$RUNNER_TEMP/gallery/screenshots-$LEG.html" --title "$TITLE: $LEG, ${GITHUB_SHA::8}"
+    - uses: actions/upload-artifact@v7
+      continue-on-error: true
+      with:
+        path: ${{ runner.temp }}/gallery/screenshots-${{ inputs.leg }}.html
+        archive: false
+    - name: Summary
+      id: summary
+      if: always()
+      shell: bash
+      env:
+        LEG: ${{ inputs.leg }}
+        TITLE: ${{ inputs.title }}
+      run: |
+        status=0
+        python -I "$GITHUB_ACTION_PATH/../../../ci/test_summary.py" "$TITLE ($LEG)" "$RUNNER_TEMP/results-$LEG" \
+          > "$RUNNER_TEMP/summary.md" || status=$?
+        cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        exit $status
+    # a commit status rather than a check run: GitHub files a check run made with the workflow's token under one of the
+    # commit's workflow runs, prefixed with that workflow's name. On a fork's pull request, its head commit
+    - name: Status
+      if: always() && inputs.status != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        CONTEXT: ${{ inputs.status }}
+        PASSED: ${{ steps.summary.outputs.passed }}
+        FAILED: ${{ steps.summary.outputs.failed }}
+        SKIPPED: ${{ steps.summary.outputs.skipped }}
+        NOWHERE: ${{ steps.summary.outputs.nowhere }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        if [ -z "$PASSED" ]; then state=failure; text="no summary: see the run"
+        elif [ $((PASSED + FAILED + SKIPPED + NOWHERE)) -eq 0 ]; then state=failure; text="no test results"
+        else
+          text="$PASSED passed, $FAILED failed, $SKIPPED skipped"
+          [ "$NOWHERE" -gt 0 ] && text="$text, $NOWHERE run in no job"
+          if [ "$FAILED" -gt 0 ] || [ "$NOWHERE" -gt 0 ]; then state=failure; else state=success; fi
+        fi
+        gh api "repos/$REPO/statuses/$SHA" -f state="$state" -f context="$CONTEXT" -f description="$text" \
+          -f target_url="$RUN_URL" --jq '"status \(.context): \(.state), \(.description)"'
