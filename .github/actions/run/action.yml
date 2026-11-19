@@ -2,7 +2,9 @@ name: KspTest run
 description: >-
   A test project's in-game tests (dotnet test, after the setup action), built against the game and KspTest as setup
   left them (KspDir, KspTestRoot). Its results, logs and TRX are uploaded as ingame-results-NAME, with a crashed KSP's
-  Player.log and crash folder: never the game or an instance. Fails when a test does.
+  Player.log and crash folder: never the game or an instance. With coverage (Windows), the mod's assemblies are
+  instrumented once built (ci/coverage/coverage.sh) and each session's counts uploaded as coverage-NAME; a failure to
+  instrument leaves the tests on the plain build, with a warning. Fails when a test does.
 
 inputs:
   project:
@@ -17,10 +19,36 @@ inputs:
   args:
     description: More dotnet test arguments (-p:Name=Value and the like), space separated
     default: ""
+  coverage:
+    description: >-
+      The mod's assemblies to measure line coverage of, as its build leaves them (one folder under a GameData), from the
+      repository root, space separated; Windows only (AltCover)
+    default: ""
 
 runs:
   using: composite
   steps:
+    - name: Build
+      if: inputs.coverage != '' && runner.os == 'Windows'
+      shell: bash
+      env:
+        PROJECT: ${{ inputs.project }}
+        ARGS: ${{ inputs.args }}
+      run: |
+        # shellcheck disable=SC2086
+        dotnet build "$PROJECT" -p:KspDir="$KSPTEST_GAME" -p:KspTestRoot="$KSPTEST_ROOT" $ARGS -nologo -v q
+        echo "KSPTEST_BUILT=1" >> "$GITHUB_ENV"
+    - name: Instrument
+      id: instrument
+      if: inputs.coverage != '' && runner.os == 'Windows'
+      continue-on-error: true
+      shell: bash
+      env:
+        COVERAGE: ${{ inputs.coverage }}
+      run: |
+        # shellcheck disable=SC2086
+        bash "$GITHUB_ACTION_PATH/../../../ci/coverage/coverage.sh" instrument $COVERAGE ||
+          { echo "::warning::not instrumented: the in-game tests run on the plain build"; exit 1; }
     - name: In-game tests
       shell: bash
       env:
@@ -33,9 +61,24 @@ runs:
         # shellcheck disable=SC2206
         args=(test "$PROJECT" -p:KspDir="$KSPTEST_GAME" -p:KspTestRoot="$KSPTEST_ROOT" $ARGS
               --logger "console;verbosity=normal" --logger "trx;LogFileName=ingame-$NAME.trx" --results-directory "$KSPTEST_WORK/trx")
+        # built (and instrumented) above: as it is
+        [ -n "$KSPTEST_BUILT" ] && args+=(--no-build)
         [ -n "$FILTER" ] && args+=(--filter "$FILTER")
         # without xUnit's "[xUnit.net 0:00:12.34] Assembly: " before each line: KspTest's lines carry their own stamp
         dotnet "${args[@]}" 2>&1 | sed -u -E 's/^\[xUnit\.net [0-9:.]+\] ([^ :]+: )?//'
+    - name: Coverage counts
+      if: always() && steps.instrument.outcome == 'success'
+      shell: bash
+      env:
+        NAME: ${{ inputs.name }}
+      run: bash "$GITHUB_ACTION_PATH/../../../ci/coverage/coverage.sh" collect "$NAME"
+    # the counts only
+    - uses: actions/upload-artifact@v6
+      if: always() && steps.instrument.outcome == 'success'
+      with:
+        name: coverage-${{ inputs.name }}
+        path: ${{ runner.temp }}/cov/ingame-*.xml
+        if-no-files-found: warn
     # a crashed KSP leaves its native stack in Unity's Player.log and the crash folder, outside the results
     - name: Crash reports
       if: failure()
@@ -56,6 +99,7 @@ runs:
       if: always()
       with:
         name: ingame-results-${{ inputs.name }}
+        # the sessions' coverage counts go in the coverage artifact
         path: |
           ${{ runner.temp }}/results
           ${{ runner.temp }}/trx

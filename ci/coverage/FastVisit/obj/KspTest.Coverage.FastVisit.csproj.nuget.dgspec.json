@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\Matt\\Downloads\\ksp-claude\\KspTest-main\\ci\\coverage\\FastVisit\\KspTest.Coverage.FastVisit.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\Matt\\Downloads\\ksp-claude\\KspTest-main\\ci\\coverage\\FastVisit\\KspTest.Coverage.FastVisit.csproj": {
+      "version": "0.1.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\Matt\\Downloads\\ksp-claude\\KspTest-main\\ci\\coverage\\FastVisit\\KspTest.Coverage.FastVisit.csproj",
+        "projectName": "KspTest.Coverage.FastVisit",
+        "projectPath": "C:\\Users\\Matt\\Downloads\\ksp-claude\\KspTest-main\\ci\\coverage\\FastVisit\\KspTest.Coverage.FastVisit.csproj",
+        "packagesPath": "C:\\Users\\Matt\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Matt\\Downloads\\ksp-claude\\KspTest-main\\ci\\coverage\\FastVisit\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Matt\\Downloads\\ksp-claude\\NuGet.Config",
+          "C:\\Users\\Matt\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Users\\Matt\\Downloads\\ksp-claude\\nuget-local": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "framework": "net472",
+            "targetAlias": "net472",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "noWarn": [
+            "NU5100",
+            "NU5131"
+          ],
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.400"
+      },
+      "frameworks": {
+        "net472": {
+          "framework": "net472",
+          "targetAlias": "net472",
+          "dependencies": {
+            "Microsoft.NETFramework.ReferenceAssemblies": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.3, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.403\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

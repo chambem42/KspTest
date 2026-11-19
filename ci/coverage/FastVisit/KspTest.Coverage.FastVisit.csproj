@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        Coverage runs only (ci/coverage/coverage.sh): stands in for AltCover's recorder at every instrumented point of a
+        mod (CovPatch rewrites the calls after AltCover instruments it), passing only a point's first visit on. Goes beside
+        AltCover.Recorder.g.dll in the mod's Plugins folder; loaded by KSP's Mono, so net472.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net472</TargetFramework>
+        <AssemblyName>KspTest.Coverage.FastVisit</AssemblyName>
+        <LangVersion>latest</LangVersion>
+        <Optimize>true</Optimize>
+        <IsPackable>false</IsPackable>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    </ItemGroup>
+
+</Project>

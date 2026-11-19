@@ -58,6 +58,29 @@ runs:
           > "$RUNNER_TEMP/summary.md" || status=$?
         cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
         exit $status
+    # the leg's coverage counts (the run action's coverage-LEG* artifacts), if it measured any, merged into one report
+    - uses: actions/download-artifact@v8
+      if: always()
+      continue-on-error: true
+      with:
+        pattern: coverage-${{ inputs.leg }}*
+        merge-multiple: true
+        path: ${{ runner.temp }}/cov
+    - name: Coverage
+      id: coverage
+      if: always()
+      continue-on-error: true
+      shell: bash
+      run: |
+        if ls "$RUNNER_TEMP"/cov/*.xml >/dev/null 2>&1; then
+          COV="$RUNNER_TEMP/cov" bash "$GITHUB_ACTION_PATH/../../../ci/coverage/coverage.sh" report "${GITHUB_REPOSITORY#*/}/"
+          echo "measured=true" >> "$GITHUB_OUTPUT"
+        fi
+    - uses: actions/upload-artifact@v6
+      if: always() && steps.coverage.outputs.measured == 'true'
+      with:
+        name: report-coverage-${{ inputs.leg }}
+        path: ${{ runner.temp }}/cov
     # a commit status rather than a check run: GitHub files a check run made with the workflow's token under one of the
     # commit's workflow runs, prefixed with that workflow's name. On a fork's pull request, its head commit
     - name: Status

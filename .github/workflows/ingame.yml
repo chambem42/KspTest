@@ -73,6 +73,13 @@ on:
         description: Where the artifact goes, from the repository root
         type: string
         default: ""
+      coverage:
+        description: >-
+          The mod's assemblies to measure line coverage of (AltCover, on Windows), as the test project's build leaves
+          them (one folder under a GameData), from the repository root, space separated: the report goes in the Windows
+          leg's summary
+        type: string
+        default: ""
       timeout-minutes:
         description: Each test job's timeout
         type: number
@@ -171,6 +178,7 @@ jobs:
           name: ${{ env.JOB_NAME }}
           filter: ${{ inputs.filter }}
           args: ${{ inputs.test-args }}
+          coverage: ${{ inputs.coverage }}
 
   linux:
     needs: game

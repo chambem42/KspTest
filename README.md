@@ -209,6 +209,8 @@ in-game jobs are skipped with a notice. A fork's pull request runs only once som
 latest commit and labelled it `run-ingame`. Inputs (`.github/workflows/ingame.yml`): `legs` (`["windows", "linux"]`),
 `shards` (jobs each leg is split between), `filter`, `test-args`, `mods` (CKAN mods installed into the game itself, to
 build against), `prepare` (a command run before the tests: staging references, say), `artifact` (a build job's output),
+`coverage` (the mod's assemblies, as built: line coverage with AltCover on Windows, `ci/coverage/`, reported in the leg's
+summary),
 `title`. The jobs: a gate, the tests, and per leg its summary, a page of its screenshots and one commit status.
 
 The steps are composite actions a workflow of its own can use too: `gate` (whether a fork's pull request may run),

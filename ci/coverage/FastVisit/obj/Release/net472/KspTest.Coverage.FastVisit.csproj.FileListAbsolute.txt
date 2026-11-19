@@ -1,0 +1,12 @@
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\bin\Release\net472\KspTest.Coverage.FastVisit.dll
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\bin\Release\net472\KspTest.Coverage.FastVisit.pdb
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\obj\Release\net472\KspTest.Coverage.FastVisit.csproj.AssemblyReference.cache
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\obj\Release\net472\KspTest.Coverage.FastVisit.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\obj\Release\net472\KspTest.Coverage.FastVisit.AssemblyInfoInputs.cache
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\obj\Release\net472\KspTest.Coverage.FastVisit.AssemblyInfo.cs
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\obj\Release\net472\KspTest.Coverage.FastVisit.csproj.CoreCompileInputs.cache
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\obj\Release\net472\KspTest.Coverage.FastVisit.sourcelink.json
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\obj\Release\net472\KspTest.Coverage.FastVisit.dll
+C:\Users\Matt\Downloads\ksp-claude\KspTest-main\ci\coverage\FastVisit\obj\Release\net472\KspTest.Coverage.FastVisit.pdb
+C:\Users\Matt\AppData\Local\Temp\claude\76fe00be4fd50cbf\98153344-b622-4c28-a867-656e79a87a98\scratchpad\covtest\cov\fastvisit\KspTest.Coverage.FastVisit.dll
+C:\Users\Matt\AppData\Local\Temp\claude\76fe00be4fd50cbf\98153344-b622-4c28-a867-656e79a87a98\scratchpad\covtest\cov\fastvisit\KspTest.Coverage.FastVisit.pdb
