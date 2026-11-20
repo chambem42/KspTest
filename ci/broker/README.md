@@ -25,7 +25,7 @@ is still what keeps strangers' code from it.
    npx wrangler secret put ARCHIVE_KEY          (the archives' 7z password)
    npx wrangler deploy
    ```
-   Its URL (`https://ksptest-game.<subdomain>.workers.dev`) is the reusable workflow's `broker` default.
+   Its URL (`https://ksptest-game.chambem42.workers.dev`) is the reusable workflow's `broker` default.
 3. **Callers**: a job calling the reusable workflow grants `id-token: write` (`permissions:`); that is all.
 
 Adding an account: `ALLOWED_OWNERS` in `wrangler.toml`, then `npx wrangler deploy`. Revoking: take it out, or rotate the

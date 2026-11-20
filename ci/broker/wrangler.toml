@@ -6,8 +6,8 @@ main = "worker.js"
 compatibility_date = "2025-06-01"
 
 [vars]
-APP_ID = ""            # the GitHub App's ID (its settings page)
-INSTALLATION_ID = ""   # its installation on the game repository (the installation's settings URL ends in it)
+APP_ID = "5842343"          # the GitHub App's ID (its settings page)
+INSTALLATION_ID = "183886889"   # its installation on the game repository (the installation's settings URL ends in it)
 ASSETS_REPO = "chambem42/ksp-ci-assets"
 # the accounts whose repositories get the game: every repository of theirs, any workflow
 ALLOWED_OWNERS = "chambem42,KSPModStewards,KSP-RO"

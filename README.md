@@ -199,7 +199,6 @@ jobs:
     permissions: { contents: read, pull-requests: write, statuses: write, id-token: write }
     with:
       test-project: KspTests/MyMod.KspTests.Run
-      broker: https://ksptest-game.example.workers.dev
 ```
 
 The game is stock KSP from encrypted 7z volumes in a private repository's release (`ci/Pack-KspGame.ps1` makes them).

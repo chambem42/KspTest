@@ -89,9 +89,9 @@ on:
         type: number
         default: 90
       broker:
-        description: KspTest's game broker (ci/broker), for a repository with no game of its own; empty for none
+        description: "KspTest's game broker (ci/broker), for a repository with no game of its own (empty: none)"
         type: string
-        default: ""
+        default: https://ksptest-game.chambem42.workers.dev
       before:
         description: >-
           A bash command run in the first Windows job before its in-game tests, after the build is instrumented (unit

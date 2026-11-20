@@ -1,0 +1,46 @@
+name: Broker check
+
+# Run by hand: the game broker (ci/broker) end to end, as a test job meets it. The setup action asks the broker for this
+# job's OIDC token, downloads the game's release with the token it answers and extracts it with the key (a wrong or
+# missing ARCHIVE_KEY fails the extraction). On each OS the tests run on, the game's launcher found at the end.
+
+on:
+  workflow_dispatch:
+    inputs:
+      broker:
+        description: The broker's URL
+        default: https://ksptest-game.chambem42.workers.dev
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          broker: ${{ inputs.broker }}
+          ckan-cache: "false"
+          durations: "false"
+      - name: The game
+        run: |
+          ls "$KSPTEST_GAME" | head -20
+          if [ -f "$KSPTEST_GAME/KSP_x64.exe" ] || [ -f "$KSPTEST_GAME/KSP.x86_64" ]; then
+            echo "the broker's game, downloaded and extracted: $(du -sh "$KSPTEST_GAME" | cut -f1)"
+          else
+            echo "::error::no KSP launcher in $KSPTEST_GAME"; exit 1
+          fi
