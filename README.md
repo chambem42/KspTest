@@ -213,7 +213,8 @@ build against), `prepare` (a command run before the tests: staging references, s
 `coverage` (the mod's assemblies, as built: line coverage with AltCover on Windows, `ci/coverage/`, reported in the leg's
 summary), `broker` (the game broker's URL), `before` (a command run in the first Windows job before its tests, after instrumenting: unit tests, their
 counts joining the coverage), `statuses` (false: no commit statuses), `save-caches` (false: neither durations nor CKAN
-downloads saved, for a build of unmerged code), `title`. The jobs: a gate, the tests, per leg its summary, a page of its
+downloads saved, for a build of unmerged code), `ref` and `bundle` (the commit tested instead of the run's: a git
+bundle in the artifact for commits on no branch), `title`. The jobs: a gate, the tests, per leg its summary, a page of its
 screenshots, one commit status and its test durations saved (a split leg's shards deal the tests by them), and CKAN's
 new downloads added to the download cache (`ci/ckan_cache.sh`).
 
@@ -221,8 +222,53 @@ The steps are composite actions a workflow of its own can use too: `gate` (wheth
 `setup` (the game, CKAN and its download cache, .NET, a screen, and the `KSPTEST_*` environment: `KSPTEST_ROOT` is the
 action's own copy of KspTest, so a repository needs neither a submodule nor a checkout of it), `run` (`dotnet test` and
 its results artifact), `report` (`ci/test_summary.py`, `ci/shots_gallery.py`, the status), `durations` (restore before
-a split run, save after a leg) and `ckan-cache` (the new downloads saved), each
+a split run, save after a leg), `ckan-cache` (the new downloads saved) and `test-release-merge` (below), each
 `chambem42/KspTest/.github/actions/<name>@main`.
+
+### Test releases
+
+`.github/workflows/test-release.yml` (Make Test Release) publishes a mod's test release, run by hand: the default
+branch with the open pull requests labelled `ready-for-testing` merged in, then collect changes -> build -> run tests
+-> publish prerelease:
+
+```yaml
+name: Make Test Release
+on:
+  workflow_dispatch:
+    inputs:
+      force: { type: boolean, default: false }
+      dry-run: { type: boolean, default: false }
+concurrency:
+  group: test-release
+  cancel-in-progress: true
+jobs:
+  release:
+    uses: chambem42/KspTest/.github/workflows/test-release.yml@main
+    permissions: { contents: write, pull-requests: write, statuses: write, id-token: write }
+    with:
+      force: ${{ inputs.force }}
+      dry-run: ${{ inputs.dry-run }}
+      solution: MyMod.sln
+      package: cp -r GameData "$RELEASE_DIR/" && cp -r GameData "$TESTS_DIR/"
+      test-project: KspTests/MyMod.KspTests.Run
+```
+
+- **collect** (`test-release-merge`, `ci/test_release_merge.sh`, git only): merges the labelled pull requests, lower
+  numbers first. The label counts when the last to put it on has write access, and a pull request by someone without
+  it also needs that person's review of its latest commit. One that conflicts stops the run with a comment on it. The
+  release notes list the pull requests and the default branch's changes since the latest stable release. Nothing is
+  published when nothing changed since the last test release (`force` publishes anyway).
+- **build**: the merge, read-only. `dependencies` (CKAN, KSPBuildTools), `stamp` (a command writing
+  `TEST_RELEASE_VERSION` and `TEST_RELEASE_COMMIT` into the source), `solution` (KSPBuildTools compile), then
+  `package` (a command putting the release's files in `RELEASE_DIR` and the tests' in `TESTS_DIR`).
+- **tests**: `ingame.yml` on the merge, with `TESTS_DIR` at `artifact-path` (`ci`), no commit statuses and no caches
+  saved. Its inputs pass through (`legs`, `shards`, `prepare`, `before`, ...). No `test-project`, no tests.
+- **publish**: only when the tests ran and passed, and not on a `dry-run`. Tags the merge `v<version>_testing` and
+  makes a prerelease of `RELEASE_DIR` zipped (`asset`, `name`).
+
+The version is the latest stable release's first three numbers and a fourth counting the test releases on it
+(0.17.0.0, then v0.17.0.1_testing, ...), so stable releases end in .0; the stable tag is `v` and four numbers, anything
+after an `_`. CKAN offers a prerelease to players whose stability tolerance is Testing.
 
 ## ksptest
 

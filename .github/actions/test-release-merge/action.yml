@@ -1,0 +1,55 @@
+name: KspTest test release merge
+description: >-
+  Make Test Release's collect step (ci/test_release_merge.sh): merges the open pull requests labelled for the test
+  release onto the checked-out default branch (fetch-depth 0), git only, and writes the merge's bundle and the release
+  notes to `out`. Runs nothing of the pull requests. Needs pull-requests: write (it takes a label off, with a comment,
+  when the labeller may not put that pull request in, and comments on one that conflicts).
+
+inputs:
+  label:
+    description: The label that puts a pull request in
+    default: ready-for-testing
+  force:
+    description: true to publish even if the default branch and the labelled commits are what the last test release has
+    default: "false"
+  max-revision:
+    description: The highest fourth version number the mod can take (0, none)
+    default: "0"
+  out:
+    description: Where merged.bundle and notes.md go
+    required: true
+  token:
+    description: A token that may read the repository, and label and comment on its pull requests
+    default: ${{ github.token }}
+
+outputs:
+  build:
+    description: true when there is something to build and publish
+    value: ${{ steps.merge.outputs.build }}
+  master:
+    description: The default branch's commit the merge is on
+    value: ${{ steps.merge.outputs.master }}
+  commit:
+    description: The merge (the default branch's commit itself when no pull request is labelled)
+    value: ${{ steps.merge.outputs.commit }}
+  version:
+    description: The test release's version, four numbers
+    value: ${{ steps.merge.outputs.version }}
+  tag:
+    description: Its tag, v<version>_testing
+    value: ${{ steps.merge.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - id: merge
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        BASE: ${{ github.event.repository.default_branch }}
+        LABEL: ${{ inputs.label }}
+        FORCE: ${{ inputs.force }}
+        MAX_REVISION: ${{ inputs.max-revision }}
+        OUT: ${{ inputs.out }}
+      run: bash "$GITHUB_ACTION_PATH/../../../ci/test_release_merge.sh"

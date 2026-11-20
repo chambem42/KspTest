@@ -1,0 +1,369 @@
+name: Make Test Release
+
+# A test release of a mod, as one job in a workflow the repository runs by hand: its default branch with the open pull
+# requests labelled ready-for-testing merged in, built, tested, and published as a GitHub prerelease.
+#
+#   name: Make Test Release
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         force: { type: boolean, default: false }
+#         dry-run: { type: boolean, default: false }
+#   concurrency:
+#     group: test-release
+#     cancel-in-progress: true
+#   jobs:
+#     release:
+#       uses: chambem42/KspTest/.github/workflows/test-release.yml@main
+#       permissions: { contents: write, pull-requests: write, statuses: write, id-token: write }
+#       with:
+#         force: ${{ inputs.force }}
+#         dry-run: ${{ inputs.dry-run }}
+#         solution: MyMod.sln
+#         package: cp -r GameData "$RELEASE_DIR/" && cp -r GameData "$TESTS_DIR/"
+#         test-project: KspTests/MyMod.KspTests.Run
+#
+# collect changes -> build -> run tests -> publish prerelease:
+#
+# collect (the test-release-merge action, ci/test_release_merge.sh), git only: the labelled pull requests merged onto
+#   the default branch, lower numbers first. The label counts when the last to put it on has write access; a pull
+#   request by someone without write access also needs that person's review of its latest commit (as run-ingame), so
+#   a push after the review takes it out. Those that fail this lose the label, with a comment saying why. One that
+#   conflicts stops the run, with a comment on it naming what it conflicts with (once per conflict); one whose commits
+#   are all in another labelled one is left out, the other bringing them, so two conflicting ones go in together
+#   through a third that merges both with the conflict resolved. Nothing to publish when the default branch and the
+#   labelled commits are what the last test release has (force: publish anyway); with none labelled, a build of the
+#   default branch alone replaces the last test release (none after a stable release). The release notes list the
+#   pull requests and the default branch's changes since the latest stable release.
+# build: the merge, with a read-only token and no cache, the version stamped (stamp), compiled (KSPBuildTools, with
+#   the CKAN dependencies), and packaged (package): what goes in the release's zip into RELEASE_DIR, what the tests
+#   take into TESTS_DIR (downloaded to artifact-path in the test jobs).
+# tests: ingame.yml on the merge, without commit statuses (the merge is no branch's commit) or saved caches. No
+#   test-project: none.
+# publish: only once the tests ran and passed, and not on a dry run. Runs nothing of the pull requests: it pushes the
+#   tag (the merge commit) and makes the prerelease, RELEASE_DIR zipped. GITHUB_TOKEN cannot push commits changing
+#   .github/workflows, so a pull request that does cannot be published this way.
+#
+# Versions: v<latest stable release's first three numbers>.<the test releases on it> (v0.17.0.3_testing: the third on
+# 0.17.0.0), so stable releases end in .0 (the mod's release workflow should check it); the latest stable release's
+# tag is v and four numbers, anything after an _ (v0.17.0.0_Maxwell). CKAN indexes a prerelease with release_status
+# testing, which it offers to players whose stability tolerance for the mod (or all mods) is Testing; the next stable
+# release, numbered higher, replaces it.
+#
+# One test release at a time: the caller's concurrency group, as above.
+
+on:
+  workflow_call:
+    inputs:
+      force:
+        description: Publish even if nothing changed since the last test release
+        type: boolean
+        default: false
+      dry-run:
+        description: Build and test the merge, changed or not, but publish nothing (no tag, no prerelease)
+        type: boolean
+        default: false
+      label:
+        description: The label that puts a pull request in
+        type: string
+        default: ready-for-testing
+      name:
+        description: The mod's name in the release's title (default the repository's)
+        type: string
+        default: ""
+      asset:
+        description: The zip's name before _<version>_testing.zip (default the repository's)
+        type: string
+        default: ""
+      max-revision:
+        description: The highest fourth version number the mod can take (0, none; a byte in Version.cs, 255)
+        type: number
+        default: 0
+      dependencies:
+        description: CKAN identifiers the build installs (KSPBuildTools install-dependencies), space separated
+        type: string
+        default: ""
+      solution:
+        description: The solution or project KSPBuildTools compiles (empty for none, package building it)
+        type: string
+        default: ""
+      stamp:
+        description: >-
+          A bash command run in the merge before it is compiled: the version (TEST_RELEASE_VERSION, four numbers) and
+          commit (TEST_RELEASE_COMMIT) into the source. KSP_ROOT is the game KSPBuildTools installed into
+        type: string
+        default: ""
+      package:
+        description: >-
+          A bash command run after the compile: what goes in the release's zip into RELEASE_DIR (GameData/..., say),
+          what the tests take into TESTS_DIR
+        type: string
+        required: true
+      test-project:
+        description: The KspTest .Run test project (empty for no tests)
+        type: string
+        default: ""
+      title:
+        description: The test results' title
+        type: string
+        default: Test release tests
+      legs:
+        type: string
+        default: '["windows"]'
+      shards:
+        type: number
+        default: 1
+      filter:
+        type: string
+        default: ""
+      test-args:
+        type: string
+        default: ""
+      mods:
+        type: string
+        default: ""
+      artifact-path:
+        description: Where TESTS_DIR goes in the test jobs, from the repository root
+        type: string
+        default: ci
+      prepare:
+        description: ingame.yml's prepare, run in the merge with TESTS_DIR at artifact-path
+        type: string
+        default: ""
+      before:
+        type: string
+        default: ""
+      timeout-minutes:
+        type: number
+        default: 90
+      broker:
+        type: string
+        default: https://ksptest-game.chambem42.workers.dev
+
+    secrets:
+      KSP_GAME_TOKEN:
+        required: false
+      KSP_GAME_KEY:
+        required: false
+
+    outputs:
+      tag:
+        description: The test release's tag (published unless a dry run, or the tests failed)
+        value: ${{ jobs.collect.outputs.tag }}
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      build: ${{ steps.merge.outputs.build }}
+      master: ${{ steps.merge.outputs.master }}
+      commit: ${{ steps.merge.outputs.commit }}
+      version: ${{ steps.merge.outputs.version }}
+      tag: ${{ steps.merge.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: merge
+        uses: chambem42/KspTest/.github/actions/test-release-merge@main
+        with:
+          label: ${{ inputs.label }}
+          force: ${{ inputs.force || inputs.dry-run }}
+          max-revision: ${{ inputs.max-revision }}
+          out: ${{ runner.temp }}/test-release
+
+      - uses: actions/upload-artifact@v6
+        if: steps.merge.outputs.build == 'true'
+        with:
+          name: test-release-merge
+          path: ${{ runner.temp }}/test-release
+
+  build:
+    needs: collect
+    if: needs.collect.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      KSP_ROOT: /tmp/ksp
+      # not VERSION: MSBuild takes environment variables as properties (a five-number Version failed the restore)
+      TEST_RELEASE_COMMIT: ${{ needs.collect.outputs.commit }}
+      TEST_RELEASE_VERSION: ${{ needs.collect.outputs.version }}
+      TEST_RELEASE_TAG: ${{ needs.collect.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.collect.outputs.master }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: test-release-merge
+          path: ${{ runner.temp }}/test-release
+
+      - name: Check out the merge
+        run: |
+          bundle="$RUNNER_TEMP/test-release/merged.bundle"
+          if [ -f "$bundle" ]; then git fetch -q "$bundle" HEAD; fi
+          git checkout -q --detach "$TEST_RELEASE_COMMIT"
+          git submodule update -q --init --recursive
+          mkdir -p "$RUNNER_TEMP/release" "$RUNNER_TEMP/tests"
+          { echo "RELEASE_DIR=$RUNNER_TEMP/release"; echo "TESTS_DIR=$RUNNER_TEMP/tests"; } >> "$GITHUB_ENV"
+
+      # as a mod's own release build, without a download cache: this zip goes to players
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.x
+
+      - uses: KSPModdingLibs/KSPBuildTools/.github/actions/setup-ckan@1.1.1
+        if: inputs.dependencies != ''
+        with:
+          ckan-filters: ""
+
+      - uses: KSPModdingLibs/KSPBuildTools/.github/actions/install-dependencies@1.1.1
+        if: inputs.dependencies != ''
+        with:
+          dependency-identifiers: ${{ inputs.dependencies }}
+
+      - name: Stamp
+        if: inputs.stamp != ''
+        env:
+          STAMP: ${{ inputs.stamp }}
+        run: eval "$STAMP"
+
+      - uses: KSPModdingLibs/KSPBuildTools/.github/actions/compile@1.1.1
+        if: inputs.solution != ''
+        with:
+          solution-file-path: ${{ inputs.solution }}
+
+      - name: Package
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          eval "$PACKAGE"
+          [ -n "$(ls -A "$RELEASE_DIR")" ] || { echo "::error::package left nothing in RELEASE_DIR"; exit 1; }
+          # the merge for the tests (ingame.yml's bundle), and something in the artifact either way
+          bundle="$RUNNER_TEMP/test-release/merged.bundle"
+          if [ -f "$bundle" ]; then cp "$bundle" "$TESTS_DIR/test-release.bundle"; fi
+          echo "$TEST_RELEASE_COMMIT" > "$TESTS_DIR/test-release.commit"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: test-release
+          path: ${{ runner.temp }}/release
+
+      - uses: actions/upload-artifact@v6
+        if: inputs.test-project != ''
+        with:
+          name: test-release-tests
+          path: ${{ runner.temp }}/tests
+
+  tests:
+    needs: [collect, build]
+    if: inputs.test-project != ''
+    uses: chambem42/KspTest/.github/workflows/ingame.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
+      id-token: write
+    secrets:
+      KSP_GAME_TOKEN: ${{ secrets.KSP_GAME_TOKEN }}
+      KSP_GAME_KEY: ${{ secrets.KSP_GAME_KEY }}
+    with:
+      test-project: ${{ inputs.test-project }}
+      title: ${{ inputs.title }}
+      legs: ${{ inputs.legs }}
+      shards: ${{ inputs.shards }}
+      filter: ${{ inputs.filter }}
+      test-args: ${{ inputs.test-args }}
+      mods: ${{ inputs.mods }}
+      artifact: test-release-tests
+      artifact-path: ${{ inputs.artifact-path }}
+      ref: ${{ needs.collect.outputs.master }}
+      bundle: >-
+        ${{ needs.collect.outputs.commit != needs.collect.outputs.master &&
+            format('{0}/test-release.bundle', inputs.artifact-path) || '' }}
+      prepare: ${{ inputs.prepare }}
+      before: ${{ inputs.before }}
+      timeout-minutes: ${{ inputs.timeout-minutes }}
+      broker: ${{ inputs.broker }}
+      statuses: false
+      save-caches: false
+
+  # only once the tests ran (a game: none, nothing published) and passed, and not on a dry run
+  publish:
+    needs: [collect, build, tests]
+    if: >-
+      !cancelled() && !inputs.dry-run && needs.build.result == 'success' &&
+      (inputs.test-project == '' || (needs.tests.result == 'success' && needs.tests.outputs.tested == 'true'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TEST_RELEASE_COMMIT: ${{ needs.collect.outputs.commit }}
+      TEST_RELEASE_VERSION: ${{ needs.collect.outputs.version }}
+      TEST_RELEASE_TAG: ${{ needs.collect.outputs.tag }}
+      NAME: ${{ inputs.name }}
+      ASSET: ${{ inputs.asset }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.collect.outputs.master }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: test-release-merge
+          path: ${{ runner.temp }}/test-release
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: test-release
+          path: ${{ runner.temp }}/release
+
+      - name: Publish the prerelease
+        run: |
+          repo_name=${GITHUB_REPOSITORY#*/}
+          bundle="$RUNNER_TEMP/test-release/merged.bundle"
+          if [ -f "$bundle" ]; then git fetch -q "$bundle" HEAD; fi
+          if gh release view "$TEST_RELEASE_TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::notice::$TEST_RELEASE_TAG is published already"
+            exit 0
+          fi
+          # left by a run cancelled between the tag and the release: this one's if it is at this commit
+          existing=$(git ls-remote --tags origin "refs/tags/$TEST_RELEASE_TAG" | cut -f1)
+          if [ "$existing" = "$TEST_RELEASE_COMMIT" ]; then
+            echo "$TEST_RELEASE_TAG is already at ${TEST_RELEASE_COMMIT::8}"
+          elif [ -n "$existing" ]; then
+            echo "::error::$TEST_RELEASE_TAG already exists, at ${existing::8}, not ${TEST_RELEASE_COMMIT::8}. Delete it (no release uses it?) and re-run"
+            exit 1
+          else
+            git tag "$TEST_RELEASE_TAG" "$TEST_RELEASE_COMMIT"
+            if ! git push -q origin "refs/tags/$TEST_RELEASE_TAG"; then
+              echo "::error::could not push $TEST_RELEASE_TAG. GITHUB_TOKEN cannot push commits changing .github/workflows: does a pull request?"
+              exit 1
+            fi
+          fi
+          zip="$PWD/${ASSET:-$repo_name}_${TEST_RELEASE_VERSION}_testing.zip"
+          (cd "$RUNNER_TEMP/release" && zip -qr "$zip" .)
+          if ! gh release create "$TEST_RELEASE_TAG" "$zip" -R "$GITHUB_REPOSITORY" --verify-tag --prerelease --latest=false \
+              --title "${NAME:-$repo_name} v$TEST_RELEASE_VERSION (testing)" --notes-file "$RUNNER_TEMP/test-release/notes.md"; then
+            git push -q origin ":refs/tags/$TEST_RELEASE_TAG" || true
+            exit 1
+          fi
