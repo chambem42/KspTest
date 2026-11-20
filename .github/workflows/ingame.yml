@@ -10,15 +10,16 @@ name: In-game tests
 #   jobs:
 #     ingame:
 #       uses: chambem42/KspTest/.github/workflows/ingame.yml@main
-#       permissions: { contents: read, pull-requests: write, statuses: write }
-#       secrets: inherit
+#       permissions: { contents: read, pull-requests: write, statuses: write, id-token: write }
 #       with:
 #         test-project: KspTests/MyMod.KspTests.Run
 #
-# KSP comes from encrypted 7z volumes in a private repository's release (ci/Pack-KspGame.ps1), through the calling
-# repository's environment ksp-game: its secrets KSP_GAME_KEY (the archive key) and KSP_GAME_TOKEN (fine-grained,
-# Contents: read-only on the game repository alone) and its variable KSP_GAME_REPO (owner/name). Without the variable
-# the in-game jobs are skipped with a notice, not failed (a fork running its own pushes, say).
+# KSP comes from encrypted 7z volumes in a private repository's release (ci/Pack-KspGame.ps1). A repository in one of
+# the accounts KspTest's game broker allows (ci/broker) gets it from the broker, for the job's OIDC token (id-token:
+# write): no secrets. Any other brings a game of its own: its variable KSP_GAME_REPO (owner/name) and its secrets
+# KSP_GAME_TOKEN (fine-grained, Contents: read-only on that repository alone) and KSP_GAME_KEY (the archive key), passed
+# (secrets: KSP_GAME_TOKEN: ..., or inherit within one account), from the repository or its environment ksp-game. With
+# neither (broker empty, no variable) the in-game jobs are skipped with a notice, not failed.
 #
 # A fork's pull request (pull_request_target: the workflow is the default branch's, the code the PR's head) runs only
 # when the gate action lets it: opened by someone with write access, or reviewed (its latest commit) and labelled
@@ -87,6 +88,10 @@ on:
         description: Each test job's timeout
         type: number
         default: 90
+      broker:
+        description: KspTest's game broker (ci/broker), for a repository with no game of its own; empty for none
+        type: string
+        default: ""
       before:
         description: >-
           A bash command run in the first Windows job before its in-game tests, after the build is instrumented (unit
@@ -104,6 +109,14 @@ on:
           code not yet merged, say). Never from a fork's pull request
         type: boolean
         default: true
+
+    secrets:
+      KSP_GAME_TOKEN:
+        description: "A game of the caller's own: a token that may read its repository's releases"
+        required: false
+      KSP_GAME_KEY:
+        description: "A game of the caller's own: the archive's key"
+        required: false
 
 permissions:
   contents: read
@@ -135,10 +148,11 @@ jobs:
       - id: check
         env:
           GAME_REPO: ${{ vars.KSP_GAME_REPO }}
+          BROKER: ${{ inputs.broker }}
           SHARDS: ${{ inputs.shards }}
         run: |
-          if [ -n "$GAME_REPO" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
-          else echo "::notice::no game set up (the environment ksp-game's KSP_GAME_REPO): the in-game tests are skipped"; fi
+          if [ -n "$GAME_REPO" ] || [ -n "$BROKER" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::no game: neither KspTest's game broker nor a game of the repository's own (KSP_GAME_REPO): the in-game tests are skipped"; fi
           # each leg's jobs: its share of the tests, k/N ("" for all of them in one job)
           jq -nc --argjson n "$SHARDS" 'if $n > 1 then [range(1; $n + 1) | "\(.)/\($n)"] else [""] end' |
             sed 's/^/shards=/' >> "$GITHUB_OUTPUT"
@@ -166,6 +180,10 @@ jobs:
     name: in-game (windows${{ matrix.shard && format(' {0}', matrix.shard) || '' }})
     runs-on: windows-2022
     timeout-minutes: ${{ inputs.timeout-minutes }}
+    # id-token: the job's OIDC token, for the game broker
+    permissions: &test-permissions
+      contents: read
+      id-token: write
     # the secrets (the caller's environment); not a deployment: the environment only holds them
     environment: &secrets
       name: ksp-game
@@ -189,6 +207,7 @@ jobs:
           game-repo: ${{ vars.KSP_GAME_REPO }}
           game-token: ${{ secrets.KSP_GAME_TOKEN }}
           game-key: ${{ secrets.KSP_GAME_KEY }}
+          broker: ${{ inputs.broker }}
           shard: ${{ matrix.shard }}
           mods: ${{ inputs.mods }}
       - uses: actions/download-artifact@v8
@@ -223,6 +242,7 @@ jobs:
     name: in-game (linux${{ matrix.shard && format(' {0}', matrix.shard) || '' }})
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions: *test-permissions
     environment: *secrets
     defaults:
       run:

@@ -4,18 +4,25 @@ description: >-
   by ci/Pack-KspGame.ps1), CKAN (pinned), .NET, a screen for batchmode KSP, and the KSPTEST_* environment that runs
   the tests in instances made from that game (batchmode, low-res textures). KspTest itself is this action's own
   repository at the ref the caller pinned (KSPTEST_ROOT, which a test project's KspTestRoot can take): no submodule or
-  second checkout. The game folder is never cached or uploaded.
+  second checkout. The game folder is never cached or uploaded. The game: with game-repo, game-token and game-key all
+  given, from the caller's own copy; else from KspTest's game broker (ci/broker), which needs the job's
+  id-token: write and the repository in one of the accounts it allows.
 
 inputs:
   game-repo:
-    description: The private repository (owner/name) whose release holds the game (vars.KSP_GAME_REPO)
-    required: true
+    description: "A game of the caller's own: the private repository (owner/name) whose release holds it (vars.KSP_GAME_REPO)"
+    default: ""
   game-token:
-    description: A token that may read that repository's releases (secrets.KSP_GAME_TOKEN)
-    required: true
+    description: "A game of the caller's own: a token that may read that repository's releases (secrets.KSP_GAME_TOKEN)"
+    default: ""
   game-key:
-    description: The archive's key (secrets.KSP_GAME_KEY)
-    required: true
+    description: "A game of the caller's own: the archive's key (secrets.KSP_GAME_KEY)"
+    default: ""
+  broker:
+    description: >-
+      KspTest's game broker's URL (ci/broker), asked when the caller gives no game of its own: the job's OIDC token
+      (id-token: write) for a token reading the game repository and the archive's key
+    default: ""
   game-release:
     description: The release's name, without the platform (ksp-1.12.5 -> ksp-1.12.5-windows)
     default: ksp-1.12.5
@@ -139,17 +146,50 @@ runs:
       with:
         path: ~/.ksptest-apt
         key: ${{ steps.apt-key.outputs.key }}
+    # the game's repository, a token reading it and the archive's key: the caller's own, else the broker's (masked)
+    - name: The game
+      id: game
+      shell: bash
+      env:
+        OWN_REPO: ${{ inputs.game-repo }}
+        OWN_TOKEN: ${{ inputs.game-token }}
+        OWN_KEY: ${{ inputs.game-key }}
+        BROKER: ${{ inputs.broker }}
+      run: |
+        if [ -n "$OWN_REPO" ] && [ -n "$OWN_TOKEN" ] && [ -n "$OWN_KEY" ]; then
+          echo "the caller's own game: $OWN_REPO"
+          { echo "repo=$OWN_REPO"; echo "token=$OWN_TOKEN"; echo "key=$OWN_KEY"; } >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if [ -z "$BROKER" ]; then
+          echo "::error::no game: give game-repo, game-token and game-key, or the broker's URL"; exit 1
+        fi
+        if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+          echo "::error::no OIDC token for the game broker: the job needs permissions id-token: write (a calling workflow grants it too)"; exit 1
+        fi
+        oidc=$(curl -fsS --retry 3 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+                 "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ksptest-game" | jq -r .value)
+        echo "::add-mask::$oidc"
+        resp=$(curl -sS --retry 3 -X POST -H "Authorization: Bearer $oidc" -w '\n%{http_code}' "$BROKER")
+        code=$(tail -n 1 <<< "$resp"); body=$(sed '$d' <<< "$resp")
+        if [ "$code" != 200 ]; then
+          echo "::error::the game broker refused ($code): $(jq -r '.error // .' <<< "$body" 2>/dev/null || echo "$body")"; exit 1
+        fi
+        token=$(jq -r .token <<< "$body"); key=$(jq -r .key <<< "$body"); repo=$(jq -r .repo <<< "$body")
+        echo "::add-mask::$token"; echo "::add-mask::$key"
+        echo "the broker's game: $repo"
+        { echo "repo=$repo"; echo "token=$token"; echo "key=$key"; } >> "$GITHUB_OUTPUT"
     - name: Download the game
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.game-token }}
-        GAME_REPO: ${{ inputs.game-repo }}
+        GH_TOKEN: ${{ steps.game.outputs.token }}
+        GAME_REPO: ${{ steps.game.outputs.repo }}
         RELEASE: ${{ inputs.game-release }}-${{ runner.os == 'Windows' && 'windows' || 'linux' }}
       run: gh release download "$RELEASE" -R "$GAME_REPO" -p '*.7z.*' -D "$KSPTEST_WORK/game-archive"
     - name: Extract the game
       shell: bash
       env:
-        KSP_GAME_KEY: ${{ inputs.game-key }}
+        KSP_GAME_KEY: ${{ steps.game.outputs.key }}
         RELEASE: ${{ inputs.game-release }}-${{ runner.os == 'Windows' && 'windows' || 'linux' }}
       run: |
         7z x -y -bso0 -bsp0 "-p$KSP_GAME_KEY" "-o$KSPTEST_GAME" "$KSPTEST_WORK/game-archive/$RELEASE.7z.001"

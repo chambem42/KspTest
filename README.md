@@ -196,21 +196,23 @@ on:
 jobs:
   ingame:
     uses: chambem42/KspTest/.github/workflows/ingame.yml@main
-    permissions: { contents: read, pull-requests: write, statuses: write }
-    secrets: inherit
+    permissions: { contents: read, pull-requests: write, statuses: write, id-token: write }
     with:
       test-project: KspTests/MyMod.KspTests.Run
+      broker: https://ksptest-game.example.workers.dev
 ```
 
-The game is stock KSP from encrypted 7z volumes in a private repository's release (`ci/Pack-KspGame.ps1` makes them),
-given by the repository's environment `ksp-game`: the secrets `KSP_GAME_KEY` (the archive key) and `KSP_GAME_TOKEN`
-(fine-grained, Contents: read-only on the game repository alone) and the variable `KSP_GAME_REPO`. Without it the
-in-game jobs are skipped with a notice. A fork's pull request runs only once someone with write access has reviewed its
+The game is stock KSP from encrypted 7z volumes in a private repository's release (`ci/Pack-KspGame.ps1` makes them).
+A repository in one of the accounts KspTest's game broker allows (`ci/broker/`) gets it from the broker for its job's
+GitHub OIDC token (hence `id-token: write`), with no secrets at all. Any other brings its own copy: the variable
+`KSP_GAME_REPO` (owner/name of its private repository) and the secrets `KSP_GAME_TOKEN` (fine-grained, Contents:
+read-only on that repository alone) and `KSP_GAME_KEY` (the archive key), passed to the workflow (`secrets:`). With
+neither, the in-game jobs are skipped with a notice. A fork's pull request runs only once someone with write access has reviewed its
 latest commit and labelled it `run-ingame`. Inputs (`.github/workflows/ingame.yml`): `legs` (`["windows", "linux"]`),
 `shards` (jobs each leg is split between), `filter`, `test-args`, `mods` (CKAN mods installed into the game itself, to
 build against), `prepare` (a command run before the tests: staging references, say), `artifact` (a build job's output),
 `coverage` (the mod's assemblies, as built: line coverage with AltCover on Windows, `ci/coverage/`, reported in the leg's
-summary), `before` (a command run in the first Windows job before its tests, after instrumenting: unit tests, their
+summary), `broker` (the game broker's URL), `before` (a command run in the first Windows job before its tests, after instrumenting: unit tests, their
 counts joining the coverage), `statuses` (false: no commit statuses), `save-caches` (false: neither durations nor CKAN
 downloads saved, for a build of unmerged code), `title`. The jobs: a gate, the tests, per leg its summary, a page of its
 screenshots, one commit status and its test durations saved (a split leg's shards deal the tests by them), and CKAN's

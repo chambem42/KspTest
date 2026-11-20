@@ -1,0 +1,16 @@
+# KspTest's game broker (README.md). Deploy: npx wrangler deploy (from this folder), after the secrets:
+#   npx wrangler secret put APP_PRIVATE_KEY < ksptest-game.private-key.pem
+#   npx wrangler secret put ARCHIVE_KEY
+name = "ksptest-game"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+APP_ID = ""            # the GitHub App's ID (its settings page)
+INSTALLATION_ID = ""   # its installation on the game repository (the installation's settings URL ends in it)
+ASSETS_REPO = "chambem42/ksp-ci-assets"
+# the accounts whose repositories get the game: every repository of theirs, any workflow
+ALLOWED_OWNERS = "chambem42,KSPModStewards,KSP-RO"
+AUDIENCE = "ksptest-game"
+# empty: any workflow of an allowed owner (KspTest's reusable workflow, or KspTest's actions in a workflow of its own)
+WORKFLOW_PREFIXES = ""
