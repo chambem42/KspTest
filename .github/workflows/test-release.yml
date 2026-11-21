@@ -181,6 +181,13 @@ jobs:
           max-revision: ${{ inputs.max-revision }}
           out: ${{ runner.temp }}/test-release
 
+      - name: Dry run
+        if: inputs.dry-run && steps.merge.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.merge.outputs.tag }}
+        run: |
+          echo "**Dry run**: builds and tests $TAG, publishes nothing (the package is the run's test-release artifact)" >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v6
         if: steps.merge.outputs.build == 'true'
         with:
